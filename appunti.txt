@@ -1,18 +1,50 @@
-CB = Code Breaker quello che guessa 
-CM = Code Maker quello che fa 
+RULES: 
 
- - il CM fa una sequenza di N colors CS =(c1,c2, …, cn) da un set di M color, con ripetizioni. 
- - il codebreaker prova a indovinare dando una N di combinazioni dei M (g1 ,g2 ,..., gn ). 
+    CB = Code Breaker quello che guessa 
+    CM = Code Maker quello che fa 
 
-Dopo ogni guest il CM risponde con due numeri :
- - CC = il numero di colori che stanno in CS e stanno nella corretta posizione. 
- - NC = il numero di colori di CS che non stanno nella corretta posizione. 
+     - il CM fa una sequenza di N colors CS =(c1,c2, …, cn) da un set di M color, con ripetizioni. 
+     - il codebreaker prova a indovinare dando una N di combinazioni dei M (g1 ,g2 ,..., gn ). 
 
-Si continua fino a che la stringa non corrisponde oppure si raggiunge il NG = numero massimo di guesses.
+    Dopo ogni guest il CM risponde con due numeri :
+     - CC = il numero di colori che stanno in CS e stanno nella corretta posizione. 
+     - NC = il numero di colori di CS che non stanno nella corretta posizione. 
 
-Il CB e CM si mettono daccordo sul numero NT = numero di turni da giocare, per ogni turno i due giocatori si cambiano i ruoli.
+    Si continua fino a che la stringa non corrisponde oppure si raggiunge il NG = numero massimo di guesses.
 
-Alla fine di ogni turno il numero di guesses che ha fatto CB è il numero di punti dato a CM.
-Se CB non indovina, allora K punti sono dati in piu a CM.
+    Il CB e CM si mettono daccordo sul numero NT = numero di turni da giocare, per ogni turno i due giocatori si cambiano i ruoli.
 
-Alla fine degli NT turni, i punti di entrambi sono confrontati e si sceglie il vincitore.
+    Alla fine di ogni turno il numero di guesses che ha fatto CB è il numero di punti dato a CM.
+    Se CB non indovina, allora K punti sono dati in piu a CM.
+
+    Alla fine degli NT turni, i punti di entrambi sono confrontati e si sceglie il vincitore.
+
+
+DEV: 
+
+    Il codice segreto della sequenza non può essere pubblicato nel ledger visto che sarebbe poi visibile a tutti. 
+
+    E infatti si usa la blockchain per:
+      - garantire che il segreto scelto da CM all'inizio di ogni turno non viene modificato (hash)
+      - verificare che il feedback dato da CM a CB per ogni turno è consistente con il segreto scelto da CM (mmmmmm non so Merkle)
+      - implementare il rewarding mechanism
+      - implementare il penalty sistem per chi non fa azioni cosi da non permettere l'avanzamento del game
+
+
+GAME: 
+
+    - start = i player decidono una valuta di Wei da mandare allo smart contract, chiamata GAME_STAKE, e questa quantità verrà usata per implementare il rewarding e il punishment. Successivamente si sceglie random il CM e il CB, ad ogni turno il CM committa l'hash del secret allo smart contract. NT (turni) e NG (guesses) sono gli stessi.  
+
+    - playing =  il CB manda le guesses allo smart contract, il CM manda i feed back allo smart contract, (CC e CN), e sono registrati nello smart contract. 
+
+    - end turn = il CM manda il secret allo smart contract e questo lo controlla, dopo fatto questo il CB ha un tempo TDisp, per controllare e disputare i feeedback mandati dal CM allo SC, per iniziare una disputa il CB manda allo smart contract una reference alla guesses che non va bene, lo smart contract allora deciderà se il CM ha intenzionalmente oppure no sbagliato (allora si manda tutto il game stake al CB), oppure se il CB sta facendo delle accuse false, e allora il contrario con il game stake. Dopo Tdisp se il CB non fa nessuna notifica, allora lo smart contract computa i punti presi dal CM. 
+
+
+    - end game = lo smart contract manda all winner tuti i game stake. 
+
+    - AFK = in ogni momento un player può dire che l'altro è AFK, a seconda di quale game_phase siamo, (quindi un modo per segnalare in ogni momento del game), l'altro player ha un time T per reagire e se non lo fa tutti i game_Stake sono mandati all'altro. 
+
+
+IMPL: 
+
+    - lo smart contract deve essere in grado di fare il manage di piu game simultaneamente,
