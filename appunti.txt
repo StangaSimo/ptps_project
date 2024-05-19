@@ -1,0 +1,18 @@
+CB = Code Breaker quello che guessa 
+CM = Code Maker quello che fa 
+
+ - il CM fa una sequenza di N colors CS =(c1,c2, …, cn) da un set di M color, con ripetizioni. 
+ - il codebreaker prova a indovinare dando una N di combinazioni dei M (g1 ,g2 ,..., gn ). 
+
+Dopo ogni guest il CM risponde con due numeri :
+ - CC = il numero di colori che stanno in CS e stanno nella corretta posizione. 
+ - NC = il numero di colori di CS che non stanno nella corretta posizione. 
+
+Si continua fino a che la stringa non corrisponde oppure si raggiunge il NG = numero massimo di guesses.
+
+Il CB e CM si mettono daccordo sul numero NT = numero di turni da giocare, per ogni turno i due giocatori si cambiano i ruoli.
+
+Alla fine di ogni turno il numero di guesses che ha fatto CB è il numero di punti dato a CM.
+Se CB non indovina, allora K punti sono dati in piu a CM.
+
+Alla fine degli NT turni, i punti di entrambi sono confrontati e si sceglie il vincitore.
