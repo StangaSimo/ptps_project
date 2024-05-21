@@ -1,5 +1,9 @@
-RULES: 
+pure o view per mandare i valori senza creare una transazione nella block chain se no si usano gli event
 
+
+
+
+RULES: 
     CB = Code Breaker quello che guessa 
     CM = Code Maker quello che fa 
 

@@ -44,8 +44,16 @@ async function main() {
     //console.log("Unlock time:", real_date(unlockTime.toString()));
     //console.log("Tempo ora:", real_date(Date.now()));
     console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
+    //const gameid = await contract.new_game();
+    //console.log("newgame: " + gameid.toString());
+    await contract.new_game();
+
+    await contract.once("new_game_event", (num) => {
+            console.log(`Event occurred at timestamp: ${num}`);
+        });
+
    
-    // Aggiungi altre interazioni qui
+
     // Ad esempio, se il contratto ha una funzione set(), puoi chiamarla così:
     // const tx = await contract.set(newValue);
     // await tx.wait();
