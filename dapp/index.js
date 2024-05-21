@@ -20,18 +20,16 @@ const path = require('path');
 const { ethers, JsonRpcProvider } = require('ethers');
 
 // Leggi l'ABI del contratto
-const abiPath = path.resolve(__dirname, '../ptps_project/artifacts/contracts/Lock.sol/Lock.json');
+const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 const abi = contractJson.abi;
 
 // Indirizzo del contratto distribuito
-const contractAddress = '0x5fbdb2315678afecb367f032d93f642f64180aa3';
+const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
 /* change in to package.json, etherjs version 5.4 */
 let url = "http://127.0.0.1:8545"
 const provider = new ethers.providers.JsonRpcProvider(url);
-
-console.log("\n\n \x1B[31m CI SIAMOOOO\n\n 	 \x1B[0m");
 
 // Account di interazione (secondo account di Hardhat)
 const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
@@ -42,15 +40,10 @@ async function main() {
     const contract = new ethers.Contract(contractAddress, abi, wallet);
 
     // Interazione con il contratto
-    const unlockTime = await contract.unlockTime();
-    console.log("Unlock time:", real_date(unlockTime.toString()));
-    console.log("Tempo ora:", real_date(Date.now()));
-
+    //const unlockTime = await contract.unlockTime();
+    //console.log("Unlock time:", real_date(unlockTime.toString()));
+    //console.log("Tempo ora:", real_date(Date.now()));
     console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
-
-    
-
-
    
     // Aggiungi altre interazioni qui
     // Ad esempio, se il contratto ha una funzione set(), puoi chiamarla così:

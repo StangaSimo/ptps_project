@@ -47,4 +47,8 @@ GAME:
 
 IMPL: 
 
-    - lo smart contract deve essere in grado di fare il manage di piu game simultaneamente,
+    - lo smart contract deve essere in grado di fare il manage di piu game simultaneamente, di far joinare i player nei game e appendere i giochi ad una lista. 
+    - quando un game viene creato, lo smart contract ritorna un unique id.
+    - 2 opzioni per entrare in un game gia creato, il gioco viene scelto dallo smart contract a random, oppure il creatore del game specifica l'id etherium del user con cui vuole giocare, allora gli manda il game id e lo smart contract controlla che i due possano giocare insieme.
+    - quando i due player sono in opartita, il contratto emette un evento che avvisa i player che il gioco può iniziare, allora le due parti decidono i soldi da committare. 
+    - the smart contract stores all state information about all games, such as the address of the creator of the game, the current phase of the game, the hash of the secret, and so on… 
