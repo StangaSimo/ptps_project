@@ -1,20 +1,4 @@
 
-//     \x1B[31m = RED
-//     \x1B[32m = GREEN
-//     \x1B[96m = Blue
-//     \x1B[01;95m = PURPLE
-//     \x1B[01;94m = VIOLET
-//     \x1B[01;93m = Yellow
-//     \x1B[01;91m = ORANGE
-//     \x1B[01;90m = GREY
-//     \x1B[01;89m = WHITE
-//     \x1B[0m = Back to your terminal's default colour
-//     ⬤
-//     https://www.alt-codes.net/circle-symbols
-
-// https://docs.ethers.org/v5/api/contract/contract/
-
-
 // interact.js
 const fs = require('fs');
 const path = require('path');
@@ -39,11 +23,9 @@ const wallet = new ethers.Wallet(privateKey, provider);
 
 
 async function waitForNewGameEvent(contract) {
-    return new Promise(async (resolve, reject) => {
-        const naAddress = '0x0000000000000000000000000000000000000000';
-        await contract.new_game(naAddress);
+    return new Promise((resolve, reject) => {
         contract.once("new_game_event", (num) => {
-            console.log(`Function return: ${num}`);
+            //console.log(`Function return: ${num}`);
             resolve(num);
         });
     });
@@ -52,15 +34,14 @@ async function waitForNewGameEvent(contract) {
 async function main() {
 
     const contract = new ethers.Contract(contractAddress, abi, wallet);
-    console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
-
-   // contract.new_game({na:'0x0000000000000000000000000000000000000000'});
-
-
+    console.log("in attesa ");
     const eventResult = await waitForNewGameEvent(contract);
-    console.log("waita " + typeof(eventResult));
+    console.log("eccooo " + eventResult);
 
-   
+    //contract.on("new_game_event", (num) => {
+    //    console.log("evento ogni tanto %o",num);
+    //})
+
 
     // Ad esempio, se il contratto ha una funzione set(), puoi chiamarla così:
     // const tx = await contract.set(newValue);
@@ -69,12 +50,3 @@ async function main() {
 }
 
 main().catch(console.error);
-
-function real_date(x) {
-    var date = new Date(x * 1000);
-    var hours = date.getHours();
-    var minutes = "0" + date.getMinutes();
-    var seconds = "0" + date.getSeconds();
-    var formattedTime = hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
-    return formattedTime
-}
