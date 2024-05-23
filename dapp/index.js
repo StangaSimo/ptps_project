@@ -36,7 +36,7 @@ const provider = new ethers.providers.JsonRpcProvider(url);
 const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 const wallet = new ethers.Wallet(privateKey, provider);
 
-
+//TODO: wait player joined
 
 async function waitForNewGameEvent(contract) {
     return new Promise(async (resolve, reject) => {
@@ -53,19 +53,10 @@ async function main() {
 
     const contract = new ethers.Contract(contractAddress, abi, wallet);
     console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
+    await contract.new_game('0x0000000000000000000000000000000000000000');
+    console.log("Game ID:", (await contract.get_gameid_byaddress(wallet.address)).toString());
+    
 
-   // contract.new_game({na:'0x0000000000000000000000000000000000000000'});
-
-
-    const eventResult = await waitForNewGameEvent(contract);
-    console.log("waita " + typeof(eventResult));
-
-   
-
-    // Ad esempio, se il contratto ha una funzione set(), puoi chiamarla così:
-    // const tx = await contract.set(newValue);
-    // await tx.wait();
-    // console.log("New value set");
 }
 
 main().catch(console.error);

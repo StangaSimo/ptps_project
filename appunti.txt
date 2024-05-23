@@ -1,5 +1,6 @@
 pure o view per mandare i valori senza creare una transazione nella block chain se no si usano gli event
 
+event sono molto piu cheap di gas rispetto alle function call. 
 
 
 
