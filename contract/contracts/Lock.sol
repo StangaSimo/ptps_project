@@ -99,6 +99,7 @@ contract Lock {
 
     //TODO: test
     function afk_checker (uint gameid) public returns (uint) {
+        //prova new pc
         
     }
 
