@@ -1,8 +1,7 @@
 {
   "name": "hardhat-project",
   "dependencies": {
-    "ethers": "5.4"
+    "ethers": "5.4",
+    "readline-sync": "^1.4.10"
   }
 }
-
-

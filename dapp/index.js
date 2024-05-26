@@ -36,6 +36,9 @@ const provider = new ethers.providers.JsonRpcProvider(url);
 const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 const wallet = new ethers.Wallet(privateKey, provider);
 
+var readlineSync = require('readline-sync');
+
+
 //TODO: wait player joined
 
 async function waitForNewGameEvent(contract) {
@@ -50,22 +53,47 @@ async function waitForNewGameEvent(contract) {
 }
 
 async function main() {
+    //const contract = new ethers.Contract(contractAddress, abi, wallet);
+    //console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
+    //await contract.('0x0000000000000000000000000000000000000000');
+    //console.log("Game ID:", (await contract.get_gameid_byaddress(wallet.address)).toString());
 
     const contract = new ethers.Contract(contractAddress, abi, wallet);
     console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
-    await contract.new_game('0x0000000000000000000000000000000000000000');
-    console.log("Game ID:", (await contract.get_gameid_byaddress(wallet.address)).toString());
-    
+    var id = readlineSync.question('cosa si chiede?');
+    await contract.prova(id);
+
 
 }
 
 main().catch(console.error);
 
-function real_date(x) {
-    var date = new Date(x * 1000);
-    var hours = date.getHours();
-    var minutes = "0" + date.getMinutes();
-    var seconds = "0" + date.getSeconds();
-    var formattedTime = hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
-    return formattedTime
+
+function showInitialPrompt() {
+  console.log("Benvenuto a Mastermind sulla Blockchain!");
+  console.log("Scegli un'opzione:");
+  console.log("1. Crea un nuovo gioco");
+  console.log("2. Unisciti a un gioco specifico (specifica il Game ID)");
+  console.log("3. Unisciti a un gioco casuale");
+
+  rl.question("Inserisci il numero dell'opzione scelta: ", (userChoice) => {
+    // Gestisci le opzioni con uno switch
+    switch (userChoice) {
+      case '1':
+        createNewGame();
+        break;
+      case '2':
+        rl.question("Inserisci il Game ID: ", (gameId) => {
+          joinSpecificGame(gameId);
+        });
+        break;
+      case '3':
+        joinRandomGame();
+        break;
+      default:
+        console.log("Opzione non valida. Riprova.");
+        showInitialPrompt(); // Riproponi il prompt se l'opzione non è valida
+        break;
+    }
+  });
 }

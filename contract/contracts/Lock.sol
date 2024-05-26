@@ -58,19 +58,17 @@ contract Lock {
         games[game.gameID] = game;                        /* dobbiamo aspettare un'altro giocatore */ 
     }
 
-    //TODO: test
     function get_gameid_byaddress (address creator) public view returns (uint256) {
         return queue_games[creator];
     }
 
-    //TODO: add test
     function join_game (uint gameid) public {
         require(queue_games[msg.sender] == 0, "You already created a game");
-        require(random_queue_games[msg.sender] == 0, "You already created a game in the random");
+        require(random_queue_games[msg.sender] == 0, "You already created a game in the random queue");
 
         Game memory current_game = games[gameid];
+        require(current_game.gameID != 0, "The game doesn't exists");
         require(current_game.state == 0, "The game is already started");
-        require(current_game.creator != msg.sender, "You are the creator owner");
         require(current_game.player == msg.sender, "You are not the one that need to join this game");
         current_game.state = 1; 
         queue_games[current_game.creator] = 0;     /* remove the game on the list of queue_games */
@@ -79,10 +77,9 @@ contract Lock {
         emit player_joined(current_game.creator);  /* event for the creator that is waiting */
     }
 
-    //TODO: test
     function join_random_game () public {
-        require(queue_games[msg.sender] != 0, "You already created a game");
-        require(random_queue_games[msg.sender] != 0, "You already created a game");
+        require(queue_games[msg.sender] == 0, "You already created a game");
+        require(random_queue_games[msg.sender] == 0, "You already created a game in the random queue");
         require(it_random_queue_games.length != 0, "No games avaliable");
 
         uint index = it_random_queue_games.length -1;
@@ -92,6 +89,7 @@ contract Lock {
         random_queue_games[creator] = 0;     /* remove the game from the random queue */
         delete it_random_queue_games[index]; /* remove the last element */
         current_game.state = 1;
+        current_game.player = msg.sender;
         games[current_game_id] = current_game;
 
         emit random_player_joined(current_game.creator); /* event for the creator that is waiting */

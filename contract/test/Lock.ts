@@ -96,7 +96,7 @@ describe("Lock", function () {
   describe("join_game", function () {
 
     it("Should join the right user and set game state", async function () {
-      const {lock, otherAccount} = await loadFixture(deploy);
+      const { lock, otherAccount } = await loadFixture(deploy);
       await lock.new_game(otherAccount.address);
       await lock.connect(otherAccount).join_game(1);
       const game = lock.games(1);
@@ -104,171 +104,63 @@ describe("Lock", function () {
       expect((await game).player).to.equal(otherAccount.address);
     });
 
-   it("Should join the right user and deliver the event to the creator", async function () {
-      const {lock, owner, otherAccount} = await loadFixture(deploy);
+    it("Should remove the game from queue_games", async function () {
+      const { lock, otherAccount, owner } = await loadFixture(deploy);
+      await lock.new_game(otherAccount.address);
+      await lock.connect(otherAccount).join_game(1);
+      expect(await lock.queue_games(owner.address)).to.equal(0);
+    });
+
+    it("Should fail if the game id doesn't exists", async function () {
+      const { lock, owner, otherAccount } = await loadFixture(deploy);
+      await lock.new_game(otherAccount.address);
+      await expect(lock.connect(otherAccount).join_game(99)).to.be.revertedWith("The game doesn't exists");
+    });
+
+    it("Should join the right user and deliver the event to the creator", async function () {
+      const { lock, owner, otherAccount } = await loadFixture(deploy);
       await lock.new_game(otherAccount.address);
       await expect(lock.connect(otherAccount).join_game(1)).to.emit(lock, "player_joined").withArgs(owner.address);
     });
 
-    it("Should fail if a user that already created a game try to connect to a game", async function () {
-      const {lock, owner, otherAccount} = await loadFixture(deploy);
+    it("Should fail if a user that already created a game try to connect to another game", async function () {
+      const { lock, otherAccount } = await loadFixture(deploy);
       await lock.new_game(otherAccount.address);
-      await expect(lock.connect(otherAccount).join_game(1)).to.emit(lock, "player_joined").withArgs(owner.address);
+      await expect(lock.join_game(1)).to.revertedWith("You already created a game");
     });
+
+    it("Should fail if a user that wasn't suppose to join try to join this game", async function () {
+      const { lock, extraAccount, otherAccount } = await loadFixture(deploy);
+      await lock.new_game(otherAccount.address);
+      await expect(lock.connect(extraAccount).join_game(1)).to.revertedWith("You are not the one that need to join this game");
+    });
+
+
   });
 
-   //describe("join_game", function () {
-   //     it("Should allow a player to join a game created by another player", async function () {
-   //         const { lock, owner, otherAccount } = await loadFixture(deploy);
-   //         await lock.new_game(otherAccount.address);
-   //         const gameid = await lock.get_gameid_byaddress(owner.address);
-   //         await lock.connect(otherAccount).join_game(gameid);
+  describe("join_random_game", function () {
 
-   //         const game = await lock.games(gameid);
-   //         expect(game.state).to.equal(1);
-   //         expect(game.creator).to.equal(owner.address);
-   //         expect(game.player).to.equal(otherAccount.address);
-   //     });
+    it("Should join a random user and set the correct game state and deliver the event to the creator", async function () {
+      const { lock, owner, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      expect(await lock.connect(otherAccount).join_random_game()).to.emit(lock, "player_joined").withArgs(owner.address);;
+      const game = lock.games(1);
+      expect((await game).state).to.equal(1);
+      expect((await game).player).to.equal(otherAccount.address);
+    });
 
-   //     it("Should emit a player_joined event when a player joins a game", async function () {
-   //         const { lock, owner, otherAccount } = await loadFixture(deploy);
-   //         await lock.new_game(otherAccount.address);
-   //         const gameid = await lock.get_gameid_byaddress(owner.address);
-   //         await expect(lock.connect(otherAccount).join_game(gameid))
-   //             .to.emit(lock, "player_joined")
-   //             .withArgs(anyValue);
-   //     });
+    it("Should fail if there are no game avaliable", async function () {
+      const { lock } = await loadFixture(deploy);
+      await expect(lock.join_random_game()).to.revertedWith("No games avaliable");
+    });
 
-   //     it("Should revert if the player tries to join their own game", async function () {
-   //         const { lock, owner } = await loadFixture(deploy);
-   //         await lock.new_game(owner.address);
-   //         const gameid = await lock.get_gameid_byaddress(owner.address);
-   //         await expect(lock.join_game(gameid)).to.be.revertedWith("You are the creator owner");
-   //     });
+    it("Should remove the game from random_queue_game and it_random_queue_games", async function () {
+      const { lock, otherAccount, owner, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      expect(await lock.connect(otherAccount).join_random_game()).to.emit(lock, "player_joined").withArgs(owner.address);;
+      expect(await lock.random_queue_games(owner.address)).to.equal(0);
+      expect(await lock.it_random_queue_games.length).to.equal(0);
+    });
 
-   //     it("Should revert if the player is not the specified player", async function () {
-   //         const { lock, owner, otherAccount, extraAccount } = await loadFixture(deploy);
-   //         await lock.new_game(otherAccount.address);
-   //         const gameid = await lock.get_gameid_byaddress(owner.address);
-   //         await expect(lock.connect(extraAccount).join_game(gameid)).to.be.revertedWith("You are not the one that need to join this game");
-   //     });
-
-   //     it("Should revert if the game has already started", async function () {
-   //         const { lock, owner, otherAccount } = await loadFixture(deploy);
-   //         await lock.new_game(otherAccount.address);
-   //         const gameid = await lock.get_gameid_byaddress(owner.address);
-   //         await lock.connect(otherAccount).join_game(gameid);
-   //         await expect(lock.connect(otherAccount).join_game(gameid)).to.be.revertedWith("The game is already started");
-   //     });
-   // });
-
-   // describe("join_random_game", function () {
-   //     it("Should allow a player to join a random game", async function () {
-   //         const { lock, owner, addr_0, otherAccount } = await loadFixture(deploy);
-   //         await lock.new_game(addr_0);
-   //         await lock.connect(otherAccount).join_random_game();
-
-   //         const gameid = await lock.random_queue_games(owner.address);
-   //         const game = await lock.games(gameid);
-
-   //         expect(game.state).to.equal(1);
-   //         expect(game.creator).to.equal(owner.address);
-   //         expect(game.player).to.equal(otherAccount.address);
-   //     });
-
-   //     it("Should emit a random_player_joined event when a player joins a random game", async function () {
-   //         const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
-   //         await lock.new_game(addr_0);
-   //         await expect(lock.connect(otherAccount).join_random_game())
-   //             .to.emit(lock, "random_player_joined")
-   //             .withArgs(anyValue);
-   //     });
-
-   //     it("Should revert if there are no games available to join", async function () {
-   //         const { lock, otherAccount } = await loadFixture(deploy);
-   //         await expect(lock.connect(otherAccount).join_random_game()).to.be.revertedWith("No games available");
-   //     });
-
-   //     it("Should revert if the player has already created a game", async function () {
-   //         const { lock, addr_0, otherAccount } = await loadFixture(deploy);
-   //         await lock.new_game(addr_0);
-   //         await lock.new_game(otherAccount.address);
-   //         await expect(lock.join_random_game()).to.be.revertedWith("You already created a game");
-   //     });
-
-   //     it("Should revert if the player has already created a random game", async function () {
-   //         const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
-   //         await lock.new_game(addr_0);
-   //         await lock.connect(otherAccount).new_game(addr_0);
-   //         await expect(lock.connect(otherAccount).join_random_game()).to.be.revertedWith("You already created a game");
-   //     });
-   // });
-
+  });
 });
-
-//describe("Withdrawals", function () {
-//  describe("Validations", function () {
-//    it("Should revert with the right error if called too soon", async function () {
-//      const { lock } = await loadFixture(deployOneYearLockFixture);
-
-//      await expect(lock.withdraw()).to.be.revertedWith(
-//        "You can't withdraw yet"
-//      );
-//    });
-
-//    it("Should revert with the right error if called from another account", async function () {
-//      const { lock, unlockTime, otherAccount } = await loadFixture(
-//        deployOneYearLockFixture
-//      );
-
-//      // We can increase the time in Hardhat Network
-//      await time.increaseTo(unlockTime);
-
-//      // We use lock.connect() to send a transaction from another account
-//      await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-//        "You aren't the owner"
-//      );
-//    });
-
-//    it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-//      const { lock, unlockTime } = await loadFixture(
-//        deployOneYearLockFixture
-//      );
-
-//      // Transactions are sent using the first signer by default
-//      await time.increaseTo(unlockTime);
-
-//      await expect(lock.withdraw()).not.to.be.reverted;
-//    });
-//  });
-
-//  describe("Events", function () {
-//    it("Should emit an event on withdrawals", async function () {
-//      const { lock, unlockTime, lockedAmount } = await loadFixture(
-//        deployOneYearLockFixture
-//      );
-
-//      await time.increaseTo(unlockTime);
-
-//      await expect(lock.withdraw())
-//        .to.emit(lock, "Withdrawal")
-//        .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-//    });
-//  });
-
-//  describe("Transfers", function () {
-//    it("Should transfer the funds to the owner", async function () {
-//      const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-//        deployOneYearLockFixture
-//      );
-
-//      await time.increaseTo(unlockTime);
-
-//      await expect(lock.withdraw()).to.changeEtherBalances(
-//        [owner, lock],
-//        [lockedAmount, -lockedAmount]
-//      );
-//    });
-//  });
-
-//});
