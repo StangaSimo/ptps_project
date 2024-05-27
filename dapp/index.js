@@ -14,40 +14,12 @@
 
 // https://docs.ethers.org/v5/api/contract/contract/
 
-const frames = [
-    `
-+----+
-|    |
-|    |
-+----+
-    `,
-    `
-|----|
-|    |
-|    |
-|----|
-    `,
-    `
-\\    /
- \\  /
-  \\/
-  /\\
- /  \\
-/    \\
-    `,
-    `
-|----|
-|    |
-|    |
-|----|
-    `
-];
-
 var readlineSync = require('readline-sync');
 const { exit } = require('process');
 const fs = require('fs');
 const path = require('path');
 const { ethers, JsonRpcProvider } = require('ethers');
+const { start } = require('repl');
 
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
@@ -95,11 +67,19 @@ switch (userChoice) {
 const wallet = new ethers.Wallet(privateKey, provider);
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 
-async function waitForNewGameEvent() {
-    console.log(`in attesa`);
+async function waitForRandomPlayer() {
     return new Promise(async (resolve, reject) => {
         contract.once("random_player_joined", (num) => {
-            console.log(`Function return: ${num}`);
+            //console.log(`Function return: ${num}`);
+            resolve(num);
+        });
+    });
+}
+
+async function waitForPlayer() {
+    return new Promise(async (resolve, reject) => {
+        contract.once("player_joined", (num) => {
+            //console.log(`Function return: ${num}`);
             resolve(num);
         });
     });
@@ -170,37 +150,47 @@ async function newGame() {
     let gameid = (await contract.get_gameid_byaddress(wallet.address)).toString();
 
     console.clear();
-    console.log("gameID : " + gameid + "\n\n\n\n");
+    console.log("gameID : " + gameid + "\n\n");
 
-    await waitForNewGameEvent();
-     
-    console.log("ora posso");
+    console.log(`In attesa del secondo player`);
+    console.log("\n\n");
 
-    //var addr = waitRandomGameJoined()
-    //while( addr != wallet.address) {
-    //    console.log("evento ma niente");
-    //}
+    if (userChoice == 1) {
+        let addr = await waitForRandomPlayer();
+        while (addr != wallet.address)
+            addr = await waitForRandomPlayer();
+    } else {
+        let addr = await waitForPlayer();
+        while (addr != wallet.address)
+            addr = await waitForPlayer();
+    }
 
-    //console.log("PLAYER JOINATO");
+    console.log("Secondo Player entrato");
+    startGame();
+}
 
-    //let i = 0;
+async function joinGame (gameid) {
 
-    //setInterval(() => {
-    //    console.clear();
-    //    process.stdout.write(`gameID : ` + gameid + "\n\n\n\n");
-    //    process.stdout.write(`${frames[i]}\n\n\n`);
-    //    i = (i + 1) % frames.length;
-    //}, 500);
+    try {
+        await contract.join_game(gameid);
+    } catch (e) {
+        console.log("Errore ID");
+        exit(0)
+    }
 
-        
-
+    startGame();
 }
 
 async function joinRandomGame() {
     try {
         await contract.join_random_game();
     } catch (e) {
-        console.log("nessun game")
+        console.log("Nessun game disponibile");
+        exit(0)
     }
-    console.log("ci sono")
+    startGame();
+}
+
+async function startGame() {
+
 }
