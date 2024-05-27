@@ -14,32 +14,59 @@
 
 // https://docs.ethers.org/v5/api/contract/contract/
 
-
-// interact.js
+var readlineSync = require('readline-sync');
+const { exit } = require('process');
 const fs = require('fs');
 const path = require('path');
 const { ethers, JsonRpcProvider } = require('ethers');
 
-// Leggi l'ABI del contratto
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 const abi = contractJson.abi;
 
-// Indirizzo del contratto distribuito
 const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
-/* change in to package.json, etherjs version 5.4 */
 let url = "http://127.0.0.1:8545"
 const provider = new ethers.providers.JsonRpcProvider(url);
 
-// Account di interazione (secondo account di Hardhat)
-const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+console.log("\n\n");
+
+console.log("1. 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+console.log("2. 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+console.log("3. 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a");
+console.log("4. 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6");
+console.log("5. 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a");
+
+console.log("\n\n");
+
+var userChoice = readlineSync.question("Quale Account usare?");
+console.log("\n\n");
+var privateKey;
+
+switch (userChoice) {
+    case '1':
+        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+        break;
+    case '2':
+        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+        break;
+    case '2':
+        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+        break;
+    case '2':
+        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+        break;
+    case '2':
+        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+        break;
+    default:
+        console.log("Opzione non valida. Riprova.");
+        exit(0)
+}
+
 const wallet = new ethers.Wallet(privateKey, provider);
-
-var readlineSync = require('readline-sync');
-
-
-//TODO: wait player joined
+console.log("tippoooo " + typeof(privateKey))
+const contract = new ethers.Contract(contractAddress, abi, wallet);
 
 async function waitForNewGameEvent(contract) {
     return new Promise(async (resolve, reject) => {
@@ -53,47 +80,72 @@ async function waitForNewGameEvent(contract) {
 }
 
 async function main() {
-    //const contract = new ethers.Contract(contractAddress, abi, wallet);
-    //console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
+    console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
+    console.log("Wallet balance:", (await wallet.getBalance()));
+    console.log("Wallet address:", (await wallet.getAddress()));
     //await contract.('0x0000000000000000000000000000000000000000');
     //console.log("Game ID:", (await contract.get_gameid_byaddress(wallet.address)).toString());
-
-    const contract = new ethers.Contract(contractAddress, abi, wallet);
-    console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
-    var id = readlineSync.question('cosa si chiede?');
-    await contract.prova(id);
-
-
+    showInitialPrompt();
 }
 
 main().catch(console.error);
 
+async function newGame() {
+    console.log("\n\n");
+    console.log("1. random secondo player");
+    console.log("2. specifica indirizzo secondo player");
+    console.log("\n\n");
+
+    var userChoice = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+
+    switch (userChoice) {
+        case '1':
+            await contract.new_game('0x0000000000000000000000000000000000000000');
+            break;
+        case '2':
+            console.log("\n\n");
+            const gameId = readlineSync.question("Inserisci l'address: ");
+            await contract.new_game(gameId.toString());
+            break;
+        default:
+            console.log("Opzione non valida. Riprova.");
+            exit(0)
+    }
+
+    console.log("\n\n");
+    let gameid = (await contract.get_gameid_byaddress(wallet.address)).toString();
+    console.log("Game creato con GameID: " + gameid);
+    console.log("\n\n");
+}
 
 function showInitialPrompt() {
-  console.log("Benvenuto a Mastermind sulla Blockchain!");
-  console.log("Scegli un'opzione:");
-  console.log("1. Crea un nuovo gioco");
-  console.log("2. Unisciti a un gioco specifico (specifica il Game ID)");
-  console.log("3. Unisciti a un gioco casuale");
+    console.log("\n\n");
+    console.log("********************************************");
+    console.log("  Benvenuto a Mastermind sulla Blockchain! ");
+    console.log("********************************************");
+    console.log("\n\n");
+    console.log("Scegli un'opzione:");
+    console.log("1. Crea un nuovo gioco");
+    console.log("2. Unisciti a un gioco specifico (specifica il Game ID)");
+    console.log("3. Unisciti a un gioco casuale");
+    console.log("\n\n");
 
-  rl.question("Inserisci il numero dell'opzione scelta: ", (userChoice) => {
-    // Gestisci le opzioni con uno switch
+    var userChoice = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+
     switch (userChoice) {
-      case '1':
-        createNewGame();
-        break;
-      case '2':
-        rl.question("Inserisci il Game ID: ", (gameId) => {
-          joinSpecificGame(gameId);
-        });
-        break;
-      case '3':
-        joinRandomGame();
-        break;
-      default:
-        console.log("Opzione non valida. Riprova.");
-        showInitialPrompt(); // Riproponi il prompt se l'opzione non è valida
-        break;
+        case '1':
+            newGame();
+            break;
+        case '2':
+            var gameId = userChoice.question("Inserisci il Game ID: ");
+            joinGame(gameId);
+            break;
+        case '3':
+            joinRandomGame();
+            break;
+        default:
+            console.log("Opzione non valida. Riprova.");
+            showInitialPrompt(); 
+            break;
     }
-  });
 }
