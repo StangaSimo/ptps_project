@@ -59,7 +59,12 @@ contract Lock {
     }
 
     function get_gameid_byaddress (address creator) public view returns (uint256) {
-        return queue_games[creator];
+        uint256 id = queue_games[creator];
+        if (id != 0) 
+            return id;
+        id = random_queue_games[creator];
+        require(id != 0, "you didn't create any game");
+        return random_queue_games[creator];
     }
 
     function join_game (uint gameid) public {
@@ -91,17 +96,12 @@ contract Lock {
         current_game.state = 1;
         current_game.player = msg.sender;
         games[current_game_id] = current_game;
-
         emit random_player_joined(current_game.creator); /* event for the creator that is waiting */
+        console.log("ci sonoooo");
     }
 
     //TODO: test
     function afk_checker (uint gameid) public returns (uint) {
-    }
-
-    //TODO: test, remove game in player_game
-    function join_random () public {
-
     }
 
     //TODO: test, remove game in player_game

@@ -14,6 +14,35 @@
 
 // https://docs.ethers.org/v5/api/contract/contract/
 
+const frames = [
+    `
++----+
+|    |
+|    |
++----+
+    `,
+    `
+|----|
+|    |
+|    |
+|----|
+    `,
+    `
+\\    /
+ \\  /
+  \\/
+  /\\
+ /  \\
+/    \\
+    `,
+    `
+|----|
+|    |
+|    |
+|----|
+    `
+];
+
 var readlineSync = require('readline-sync');
 const { exit } = require('process');
 const fs = require('fs');
@@ -30,7 +59,6 @@ let url = "http://127.0.0.1:8545"
 const provider = new ethers.providers.JsonRpcProvider(url);
 
 console.log("\n\n");
-
 console.log("1. 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
 console.log("2. 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
 console.log("3. 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a");
@@ -48,16 +76,16 @@ switch (userChoice) {
         privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
         break;
     case '2':
-        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+        privateKey = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
         break;
-    case '2':
-        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    case '3':
+        privateKey = '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a';
         break;
-    case '2':
-        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    case '4':
+        privateKey = '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6';
         break;
-    case '2':
-        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    case '5':
+        privateKey = '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a';
         break;
     default:
         console.log("Opzione non valida. Riprova.");
@@ -65,14 +93,12 @@ switch (userChoice) {
 }
 
 const wallet = new ethers.Wallet(privateKey, provider);
-console.log("tippoooo " + typeof(privateKey))
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 
-async function waitForNewGameEvent(contract) {
+async function waitForNewGameEvent() {
+    console.log(`in attesa`);
     return new Promise(async (resolve, reject) => {
-        const naAddress = '0x0000000000000000000000000000000000000000';
-        await contract.new_game(naAddress);
-        contract.once("new_game_event", (num) => {
+        contract.once("random_player_joined", (num) => {
             console.log(`Function return: ${num}`);
             resolve(num);
         });
@@ -83,15 +109,44 @@ async function main() {
     console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
     console.log("Wallet balance:", (await wallet.getBalance()));
     console.log("Wallet address:", (await wallet.getAddress()));
-    //await contract.('0x0000000000000000000000000000000000000000');
-    //console.log("Game ID:", (await contract.get_gameid_byaddress(wallet.address)).toString());
     showInitialPrompt();
 }
 
 main().catch(console.error);
 
-async function newGame() {
+function showInitialPrompt() {
+    console.clear();
+    console.log("********************************************");
+    console.log("  Benvenuto a Mastermind sulla Blockchain! ");
+    console.log("********************************************");
     console.log("\n\n");
+    console.log("Scegli un'opzione:");
+    console.log("1. Crea un nuovo gioco");
+    console.log("2. Unisciti a un gioco specifico (specifica il Game ID)");
+    console.log("3. Unisciti a un gioco casuale");
+    console.log("\n\n");
+
+    var userChoice = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+    console.clear();
+    switch (userChoice) {
+        case '1':
+            newGame();
+            break;
+        case '2':
+            var gameId = userChoice.question("Inserisci il Game ID: ");
+            joinGame(gameId);
+            break;
+        case '3':
+            joinRandomGame();
+            break;
+        default:
+            console.log("Opzione non valida. Riprova.");
+            showInitialPrompt(); 
+            break;
+    }
+}
+
+async function newGame() {
     console.log("1. random secondo player");
     console.log("2. specifica indirizzo secondo player");
     console.log("\n\n");
@@ -109,43 +164,43 @@ async function newGame() {
             break;
         default:
             console.log("Opzione non valida. Riprova.");
-            exit(0)
+            newGame();
     }
 
-    console.log("\n\n");
     let gameid = (await contract.get_gameid_byaddress(wallet.address)).toString();
-    console.log("Game creato con GameID: " + gameid);
-    console.log("\n\n");
+
+    console.clear();
+    console.log("gameID : " + gameid + "\n\n\n\n");
+
+    await waitForNewGameEvent();
+     
+    console.log("ora posso");
+
+    //var addr = waitRandomGameJoined()
+    //while( addr != wallet.address) {
+    //    console.log("evento ma niente");
+    //}
+
+    //console.log("PLAYER JOINATO");
+
+    //let i = 0;
+
+    //setInterval(() => {
+    //    console.clear();
+    //    process.stdout.write(`gameID : ` + gameid + "\n\n\n\n");
+    //    process.stdout.write(`${frames[i]}\n\n\n`);
+    //    i = (i + 1) % frames.length;
+    //}, 500);
+
+        
+
 }
 
-function showInitialPrompt() {
-    console.log("\n\n");
-    console.log("********************************************");
-    console.log("  Benvenuto a Mastermind sulla Blockchain! ");
-    console.log("********************************************");
-    console.log("\n\n");
-    console.log("Scegli un'opzione:");
-    console.log("1. Crea un nuovo gioco");
-    console.log("2. Unisciti a un gioco specifico (specifica il Game ID)");
-    console.log("3. Unisciti a un gioco casuale");
-    console.log("\n\n");
-
-    var userChoice = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
-
-    switch (userChoice) {
-        case '1':
-            newGame();
-            break;
-        case '2':
-            var gameId = userChoice.question("Inserisci il Game ID: ");
-            joinGame(gameId);
-            break;
-        case '3':
-            joinRandomGame();
-            break;
-        default:
-            console.log("Opzione non valida. Riprova.");
-            showInitialPrompt(); 
-            break;
+async function joinRandomGame() {
+    try {
+        await contract.join_random_game();
+    } catch (e) {
+        console.log("nessun game")
     }
+    console.log("ci sono")
 }

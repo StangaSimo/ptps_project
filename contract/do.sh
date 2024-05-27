@@ -13,6 +13,13 @@ case "$1" in
   dep)
     npx hardhat ignition deploy ./ignition/modules/Lock.ts --network localhost
     ;;
+  all)
+    npx hardhat node &
+    npx hardhat ignition deploy ./ignition/modules/Lock.ts --network localhost
+    ;;
+  kill)
+    kill -SIGTSTP [PID]
+    ;;
   nod)
     npx hardhat node
     ;;
