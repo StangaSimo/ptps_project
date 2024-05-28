@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const { ethers, JsonRpcProvider } = require('ethers');
 const { start } = require('repl');
+let address_2_player;
 
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
@@ -67,28 +68,51 @@ switch (userChoice) {
 const wallet = new ethers.Wallet(privateKey, provider);
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 
+async function waitForGameID() {
+    return new Promise(async (resolve, reject) => {
+        contract.once("random_player_gameid", (addr, gameID) => {
+   //         console.log(" DEBUG " + addr + " ID "+  gameID);
+            resolve([addr, gameID]);
+        });
+    });
+}
+
+async function waitForOffer() {
+    return new Promise(async (resolve, reject) => {
+        contract.once("offer_value", (addr, option, value) => {
+            resolve([addr, option, value]);
+        });
+    });
+}
+
+async function waitForAccept() {
+    return new Promise(async (resolve, reject) => {
+        contract.once("accept_value", (addr, value) => {
+            resolve([addr, value]);
+        });
+    });
+}
+
 async function waitForRandomPlayer() {
     return new Promise(async (resolve, reject) => {
-        contract.once("random_player_joined", (num) => {
-            //console.log(`Function return: ${num}`);
-            resolve(num);
+        contract.once("random_player_joined", (addr) => {
+            resolve(addr);
         });
     });
 }
 
 async function waitForPlayer() {
     return new Promise(async (resolve, reject) => {
-        contract.once("player_joined", (num) => {
-            //console.log(`Function return: ${num}`);
-            resolve(num);
+        contract.once("player_joined", (addr) => {
+            resolve(addr);
         });
     });
 }
 
 async function main() {
-    console.log("Contract balance:", (await provider.getBalance(contractAddress)).toString());
-    console.log("Wallet balance:", (await wallet.getBalance()));
-    console.log("Wallet address:", (await wallet.getAddress()));
+    console.log("Contract Balance:", (await provider.getBalance(contractAddress)).toString());
+    console.log("Wallet Balance:", (await wallet.getBalance()));
+    console.log("Wallet Address:", (await wallet.getAddress()));
     showInitialPrompt();
 }
 
@@ -117,11 +141,11 @@ function showInitialPrompt() {
             joinGame(gameId);
             break;
         case '3':
-            joinRandomGame();
+            joinGame(0);
             break;
         default:
             console.log("Opzione non valida. Riprova.");
-            showInitialPrompt(); 
+            showInitialPrompt();
             break;
     }
 }
@@ -139,25 +163,25 @@ async function newGame() {
             break;
         case '2':
             console.log("\n\n");
-            const gameId = readlineSync.question("Inserisci l'address: ");
-            await contract.new_game(gameId.toString());
+            address_2_player = readlineSync.question("Inserisci l'address: ");
+            await contract.new_game(address_2_player.toString());
             break;
         default:
             console.log("Opzione non valida. Riprova.");
             newGame();
     }
 
-    let gameid = (await contract.get_gameid_byaddress(wallet.address)).toString();
+    let gameID = (await contract.get_gameid_byaddress(wallet.address)).toString();
 
     console.clear();
-    console.log("gameID : " + gameid + "\n\n");
-
+    console.log("gameID : " + gameID);
+    console.log("\n\n");
     console.log(`In attesa del secondo player`);
     console.log("\n\n");
 
     if (userChoice == 1) {
         let addr = await waitForRandomPlayer();
-        while (addr != wallet.address)
+        while (addr != wallet.address) 
             addr = await waitForRandomPlayer();
     } else {
         let addr = await waitForPlayer();
@@ -165,32 +189,113 @@ async function newGame() {
             addr = await waitForPlayer();
     }
 
-    console.log("Secondo Player entrato");
-    startGame();
+    console.log("Secondo player entrato");
+    startNewGame(gameID);
 }
 
-async function joinGame (gameid) {
+async function joinGame(gameID) {
+    if (gameID == 0) {
+        try {
+            await contract.join_random_game();
+            [addr, gameID] = await waitForGameID();
+            while (addr != wallet.address) 
+                [addr, gameID] = await waitForGameID();
+            startGame(gameID);
+        } catch (e) {
+            console.log("Nessun game disponibile");
+            exit(0)
+        }
+    } else {
+        try {
+            await contract.join_game(gameid);
+            startNewGame(gameID);
+        } catch (e) {
+            console.log("Errore ID");
+            exit(0)
+        }
 
-    try {
-        await contract.join_game(gameid);
-    } catch (e) {
-        console.log("Errore ID");
-        exit(0)
+    }
+}
+
+async function startNewGame(gameID) {
+    value = readlineSync.question("Quanto vuoi scommettere? ");
+    await contract.make_offer(gameID, 2, value); //2 for let second player go in the while
+
+    console.log("\n\n");
+    console.log("In attesa della risposta del secondo player...\n");
+    console.log("\n\n");
+
+    [addr, option, value] = await waitForOffer();
+    while (addr != wallet.address) 
+        [addr, option, value] = await waitForOffer();
+
+    while (option != 1) { //declined
+        console.log("Il Secondo player ha declinato l'offerta, offre a sua volta: " + value + " Gwei");
+        console.log("\n\n");
+        console.log("Scegli un'opzione:");
+        console.log("1. Accettare");
+        console.log("2. Contro Offerta");
+        console.log("\n\n");
+
+        option = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+        switch (option) {
+            case '1': //accepted
+                await contract.make_offer(gameID, option, 0); 
+                break;
+            case '2': //declined
+                var value = readlineSync.question("Quanto vuoi offire? ");
+                await contract.make_offer(gameID, option, value);
+                [addr, option, value] = await waitForOffer();
+                while (addr != wallet.address)
+                    [addr, option, value] = await waitForOffer();
+                break;
+            default:
+                console.log("Opzione non valida. Riprova.");
+        }
     }
 
-    startGame();
+    //start playing
+    console.log("\n\n\niniziamo a giocare\n\n\n");
+    exit(0);
 }
 
-async function joinRandomGame() {
-    try {
-        await contract.join_random_game();
-    } catch (e) {
-        console.log("Nessun game disponibile");
-        exit(0)
+async function startGame(gameID) {
+    console.log("\n\n");
+    console.log("In attesa dell'offerta del creator...");
+    [addr, option, value] = await waitForOffer();
+    while (addr != wallet.address) 
+        [addr, option, value] = await waitForOffer();
+
+
+    while (option != 1) {
+        console.log("\n\n");
+        console.log("Il creator del game offre: " + value + " Gwei");
+        console.log("\n\n");
+        console.log("Scegli un'opzione:");
+        console.log("1. Accettare");
+        console.log("2. Contro Offerta");
+        console.log("\n\n");
+
+        option = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+
+        switch (option) {
+            case '1': //accepted
+                await contract.make_offer(gameID, option, 0);
+                break;
+            case '2': //declined
+                var value = readlineSync.question("Quanto vuoi offire? ");
+                await contract.make_offer(gameID, option, value);
+                [addr, option, value] = await waitForOffer();
+                while (addr != wallet.address)
+                    [addr, option, value] = await waitForOffer();
+                break;
+            default:
+                console.log("Opzione non valida. Riprova.");
+        }
+
     }
-    startGame();
-}
 
-async function startGame() {
+    console.log("giochiamooooooo");
 
+    exit(0);
 }
