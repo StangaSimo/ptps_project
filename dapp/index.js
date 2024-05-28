@@ -230,7 +230,7 @@ async function startNewGame(gameID) {
         [addr, option, value] = await waitForOffer();
 
     while (option != 1) { //declined
-        console.log("Il Secondo player ha declinato l'offerta, offre a sua volta: " + value + " Gwei");
+        console.log("Il Secondo player ha declinato l'offerta, offre a sua volta: " + value + " wei");
         console.log("\n\n");
         console.log("Scegli un'opzione:");
         console.log("1. Accettare");
@@ -254,8 +254,8 @@ async function startNewGame(gameID) {
         }
     }
 
-    //start playing
-    console.log("\n\n\niniziamo a giocare\n\n\n");
+    //TODO: send money
+    startPlaying(gameID);
     exit(0);
 }
 
@@ -269,7 +269,7 @@ async function startGame(gameID) {
 
     while (option != 1) {
         console.log("\n\n");
-        console.log("Il creator del game offre: " + value + " Gwei");
+        console.log("Il creator del game offre: " + value + " wei");
         console.log("\n\n");
         console.log("Scegli un'opzione:");
         console.log("1. Accettare");
@@ -295,7 +295,11 @@ async function startGame(gameID) {
 
     }
 
-    console.log("giochiamooooooo");
-
+    //TODO: send money
+    startPlaying(gameID);
     exit(0);
+}
+
+async function startPlaying(gameID) {
+
 }

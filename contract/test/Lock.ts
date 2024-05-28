@@ -42,9 +42,9 @@ describe("Lock", function () {
 
     it("Should update allgameID each time", async function () {
       const {lock , otherAccount} = await loadFixture(deploy);
-      await lock.connect(otherAccount).get_gameid()
-      await lock.connect(otherAccount).get_gameid()
-      await lock.connect(otherAccount).get_gameid()
+      await lock.connect(otherAccount).get_gameid();
+      await lock.connect(otherAccount).get_gameid();
+      await lock.connect(otherAccount).get_gameid();
       expect(await lock.connect(otherAccount).allgameID()).to.equal(4);
     });
 
@@ -76,6 +76,8 @@ describe("Lock", function () {
       expect((await game).player).to.equal(otherAccount.address);
       expect((await game).creator).to.equal(owner.address);
       expect((await game).state).to.equal(0);
+      expect((await game).bet_value).to.equal(0);
+      expect((await game).bet_check).to.equal(false);
       expect(await lock.queue_games(owner.address)).to.equal(1);
       expect(await lock.random_queue_games(owner.address)).to.equal(0);
     });
@@ -140,10 +142,11 @@ describe("Lock", function () {
 
   describe("join_random_game", function () {
 
-    it("Should join a random user and set the correct game state and deliver the event to the creator", async function () {
+    it("Should join a random user and set the correct game state and deliver the events", async function () {
       const { lock, owner, otherAccount, addr_0 } = await loadFixture(deploy);
       await lock.new_game(addr_0);
-      expect(await lock.connect(otherAccount).join_random_game()).to.emit(lock, "player_joined").withArgs(owner.address);;
+      await expect(await lock.connect(otherAccount).join_random_game())
+        .to.emit(lock, "random_player_joined").withArgs(owner.address)
       const game = lock.games(1);
       expect((await game).state).to.equal(1);
       expect((await game).player).to.equal(otherAccount.address);
@@ -157,10 +160,92 @@ describe("Lock", function () {
     it("Should remove the game from random_queue_game and it_random_queue_games", async function () {
       const { lock, otherAccount, owner, addr_0 } = await loadFixture(deploy);
       await lock.new_game(addr_0);
-      expect(await lock.connect(otherAccount).join_random_game()).to.emit(lock, "player_joined").withArgs(owner.address);;
+      await expect(await lock.connect(otherAccount).join_random_game()).to.emit(lock, "random_player_joined").withArgs(owner.address);
       expect(await lock.random_queue_games(owner.address)).to.equal(0);
       expect(await lock.it_random_queue_games.length).to.equal(0);
     });
-
   });
+
+  describe("make_offer", function () {
+
+    it("Should make an offer correctly from creator", async function () {
+      const { lock, owner, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      await lock.connect(otherAccount).join_random_game();
+      let option = 2;
+      let value = 100;
+      await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+    });
+
+    it("Should make an offer correctly from second player", async function () {
+      const { lock, owner, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      await lock.connect(otherAccount).join_random_game();
+      let option = 2;
+      let value = 100;
+      await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+      option = 2;
+      value = 1231;
+      await expect(await lock.connect(otherAccount).make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(owner.address,option,value);
+    });
+
+    it("Should fail if gameID is not correct", async function () {
+      const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      await lock.connect(otherAccount).join_random_game();
+      let option = 2;
+      let value = 100;
+      await expect(lock.make_offer(2, option, value)).to.be.revertedWith("gameID isn't correct");
+    });
+
+    it("Should fail if option is not correct", async function () {
+      const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      await lock.connect(otherAccount).join_random_game();
+      let option = 3;
+      let value = 100;
+      await expect(lock.make_offer(1, option, value)).to.be.revertedWith("option isn't correct");
+    });
+
+    it("Should fail if sender is not creator or player", async function () {
+      const { lock, extraAccount, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      await lock.connect(otherAccount).join_random_game();
+      let option = 2;
+      let value = 100;
+      await expect(lock.connect(extraAccount).make_offer(1, option, value)).to.be.revertedWith("you aren't a player of this game");
+    });
+
+    it("Should fail if option is 1 and value is 0", async function () {
+      const { lock, extraAccount, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      await lock.connect(otherAccount).join_random_game();
+      let option = 1;
+      let value = 0;
+      await expect(lock.make_offer(1, option, value)).to.be.revertedWith("value isn't corret");
+    });
+
+    it("Should set the right game stat if the two player agree", async function () {
+      const { lock, owner, otherAccount, addr_0 } = await loadFixture(deploy);
+      await lock.new_game(addr_0);
+      await lock.connect(otherAccount).join_random_game();
+      let option = 2;
+      let value = 100;
+      await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+      await lock.connect(otherAccount).make_offer(1,1,value);
+      const game = lock.games(1);
+      expect((await game).state).to.equal(2);
+      expect((await game).bet_value).to.equal(value);
+    });
+  });
+
+
+
+
+
+
+
+
+
+
 });

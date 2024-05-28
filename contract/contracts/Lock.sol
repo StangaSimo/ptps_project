@@ -11,6 +11,8 @@ struct Game {
     address player;      /* second player */
     bytes32[NT] secrets; /* all the hashes of the secrets */
     uint8 state;         /* 1: all player joined, 2: playing, 3: endturn, 4: endgame */
+    uint256 bet_value;    
+    bool bet_check;
 }
 
 /* all struct are declared public for testing purpuses */
@@ -49,6 +51,8 @@ contract Lock {
         for (uint32 i = 0; i < NT; i++) game.secrets[i] = 0;
         game.state = 0;
         game.player = player; 
+        game.bet_value = 0; 
+        game.bet_check = false; 
 
         if (game.player == address(0)) {                  /* address(0) if has to wait for others to join in the random queue */
             it_random_queue_games.push(msg.sender);
@@ -108,36 +112,38 @@ contract Lock {
     }
 
     //TODO: test
-    function afk_checker (uint256 gameID) public returns (uint) {
-
-    }
-
-    //TODO: test, remove game in player_game
-    function end_game () public {
-
-    }
-
-    //TODO: test
     function make_offer (uint256 gameID, uint8 option, uint256 value) public {
-        require(games[gameID].gameID != 0, "gameID not correct");
-        require(option == 1 || option == 2, "option not correct");
+        require(games[gameID].gameID != 0, "gameID isn't correct");
+        require(option == 1 || option == 2, "option isn't correct");
         Game memory current_game = games[gameID];
-        require (msg.sender == current_game.creator || msg.sender == current_game.player, "you can't make the first offer");
+        require (msg.sender == current_game.creator || msg.sender == current_game.player, "you aren't a player of this game");
 
-        if (option == 2) {
-            require(value != 0, "value not corret");
+        if (option == 1) {
+            require(value != 0, "value isn't corret");
             current_game.state = 2; /* playing */
-            //TODO: accettata aggiornare
+            current_game.bet_value = value; /* playing */
+            games[gameID] = current_game;
+            //TODO send money
         }
+
 
         if (msg.sender == current_game.creator) {
             emit offer_value(current_game.player, option, value);  
         } else {
             emit offer_value(current_game.creator, option, value); 
         }
+    }
 
+    //TODO: test
+    function afk_checker (uint256 gameID) public returns (uint) {
         
     }
+
+    //TODO: test, remove game in player_game
+    function end_game () public {
+        
+    }
+
 }
 
 
