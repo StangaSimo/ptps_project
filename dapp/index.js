@@ -240,7 +240,7 @@ async function startNewGame(gameID) {
         option = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
         switch (option) {
             case '1': //accepted
-                await contract.make_offer(gameID, option, 0); 
+                await contract.make_offer(gameID, option, value); 
                 break;
             case '2': //declined
                 var value = readlineSync.question("Quanto vuoi offire? ");
@@ -280,7 +280,7 @@ async function startGame(gameID) {
 
         switch (option) {
             case '1': //accepted
-                await contract.make_offer(gameID, option, 0);
+                await contract.make_offer(gameID, option, value);
                 break;
             case '2': //declined
                 var value = readlineSync.question("Quanto vuoi offire? ");
