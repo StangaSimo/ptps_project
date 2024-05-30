@@ -14,8 +14,8 @@
 
 // https://docs.ethers.org/v5/api/contract/contract/
 
-var readlineSync = require('readline-sync');
 const { exit } = require('process');
+var readlineSync = require('readline-sync');
 const fs = require('fs');
 const path = require('path');
 const { ethers, JsonRpcProvider } = require('ethers');
@@ -25,9 +25,7 @@ let address_2_player;
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 const abi = contractJson.abi;
-
 const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
-
 let url = "http://127.0.0.1:8545"
 const provider = new ethers.providers.JsonRpcProvider(url);
 
@@ -68,33 +66,26 @@ switch (userChoice) {
 const wallet = new ethers.Wallet(privateKey, provider);
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 
-async function waitForGameID() {
-    return new Promise(async (resolve, reject) => {
-        contract.once("random_player_gameid", (addr, gameID) => {
-   //         console.log(" DEBUG " + addr + " ID "+  gameID);
-            resolve([addr, gameID]);
-        });
-    });
-}
-
 async function waitForOffer() {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
         contract.once("offer_value", (addr, option, value) => {
             resolve([addr, option, value]);
         });
     });
 }
 
-async function waitForAccept() {
-    return new Promise(async (resolve, reject) => {
-        contract.once("accept_value", (addr, value) => {
-            resolve([addr, value]);
+async function waitForBetCheck() {
+    return new Promise(async (resolve) => {
+        contract.once("bet_check", (creator, player) => {
+            resolve([creator, player]);
         });
     });
 }
 
+
+
 async function waitForRandomPlayer() {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
         contract.once("random_player_joined", (addr) => {
             resolve(addr);
         });
@@ -102,7 +93,7 @@ async function waitForRandomPlayer() {
 }
 
 async function waitForPlayer() {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
         contract.once("player_joined", (addr) => {
             resolve(addr);
         });
@@ -197,9 +188,7 @@ async function joinGame(gameID) {
     if (gameID == 0) {
         try {
             await contract.join_random_game();
-            [addr, gameID] = await waitForGameID();
-            while (addr != wallet.address) 
-                [addr, gameID] = await waitForGameID();
+            let gameID = (await contract.get_gameid_random_player()).toString();
             startGame(gameID);
         } catch (e) {
             console.log("Nessun game disponibile");
@@ -254,14 +243,14 @@ async function startNewGame(gameID) {
         }
     }
 
-    //TODO: send money
+    sendMoney(gameID, value);
     startPlaying(gameID);
     exit(0);
 }
 
 async function startGame(gameID) {
     console.log("\n\n");
-    console.log("In attesa dell'offerta del creator...");
+    console.log("Game ID " + gameID + "\n\nIn attesa dell'offerta del creator...");
     [addr, option, value] = await waitForOffer();
     while (addr != wallet.address) 
         [addr, option, value] = await waitForOffer();
@@ -295,11 +284,26 @@ async function startGame(gameID) {
 
     }
 
-    //TODO: send money
+    sendMoney(gameID, value);
     startPlaying(gameID);
     exit(0);
 }
 
+async function sendMoney(gameID, value) {
+    const args = {value: ethers.utils.parseEther(value.toString())}
+    const reciept = await contract.send_money(gameID, args);
+
+    //TODO: il check del while piu complicato
+    [creator, player] = await waitForBetCheck();
+    while ((creator != wallet.address) || (player != wallet.address))
+        [creator, player] = await waitForBetCheck();
+    console.log("I pagamenti sono stati effettuati" + reciept);
+}
+
 async function startPlaying(gameID) {
+    console.log("Game iniziato");
+     
 
 }
+
+

@@ -1,8 +1,8 @@
 import {
-  time,
+//  time,
   loadFixture,
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+//import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { expect } from "chai";
 import hre from "hardhat";
 
@@ -77,7 +77,8 @@ describe("Lock", function () {
       expect((await game).creator).to.equal(owner.address);
       expect((await game).state).to.equal(0);
       expect((await game).bet_value).to.equal(0);
-      expect((await game).bet_check).to.equal(false);
+      expect((await game).bet_check_player).to.equal(false);
+      expect((await game).bet_check_creator).to.equal(false);
       expect(await lock.queue_games(owner.address)).to.equal(1);
       expect(await lock.random_queue_games(owner.address)).to.equal(0);
     });
@@ -114,7 +115,7 @@ describe("Lock", function () {
     });
 
     it("Should fail if the game id doesn't exists", async function () {
-      const { lock, owner, otherAccount } = await loadFixture(deploy);
+      const { lock, otherAccount } = await loadFixture(deploy);
       await lock.new_game(otherAccount.address);
       await expect(lock.connect(otherAccount).join_game(99)).to.be.revertedWith("The game doesn't exists");
     });
@@ -158,18 +159,20 @@ describe("Lock", function () {
     });
 
     it("Should remove the game from random_queue_game and it_random_queue_games", async function () {
-      const { lock, otherAccount, owner, addr_0 } = await loadFixture(deploy);
+      const { lock, otherAccount, extraAccount, owner, addr_0 } = await loadFixture(deploy);
       await lock.new_game(addr_0);
       await expect(await lock.connect(otherAccount).join_random_game()).to.emit(lock, "random_player_joined").withArgs(owner.address);
+      await lock.connect(extraAccount).new_game(addr_0);
+      await expect(await lock.connect(otherAccount).join_random_game()).to.emit(lock, "random_player_joined").withArgs(extraAccount.address);
       expect(await lock.random_queue_games(owner.address)).to.equal(0);
-      expect(await lock.it_random_queue_games.length).to.equal(0);
+      expect(lock.it_random_queue_games.length).to.equal(0);
     });
   });
 
   describe("make_offer", function () {
 
     it("Should make an offer correctly from creator", async function () {
-      const { lock, owner, otherAccount, addr_0 } = await loadFixture(deploy);
+      const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
       await lock.new_game(addr_0);
       await lock.connect(otherAccount).join_random_game();
       let option = 2;
@@ -217,7 +220,7 @@ describe("Lock", function () {
     });
 
     it("Should fail if option is 1 and value is 0", async function () {
-      const { lock, extraAccount, otherAccount, addr_0 } = await loadFixture(deploy);
+      const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
       await lock.new_game(addr_0);
       await lock.connect(otherAccount).join_random_game();
       let option = 1;
@@ -226,7 +229,7 @@ describe("Lock", function () {
     });
 
     it("Should set the right game stat if the two player agree", async function () {
-      const { lock, owner, otherAccount, addr_0 } = await loadFixture(deploy);
+      const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
       await lock.new_game(addr_0);
       await lock.connect(otherAccount).join_random_game();
       let option = 2;
