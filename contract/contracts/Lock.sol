@@ -10,7 +10,7 @@ struct Game {
     address creator;     /* first player */
     address player;      /* second player */
     bytes32[NT] secrets; /* all the hashes of the secrets */
-    uint8 state;         /* 1: all player joined, 2: playing, 3: endturn, 4: endgame */
+    uint8 state;         /* 1: all player joined, 2: wait_for_bet, 3: startplaying 4:endturn, 5: endgame */
     uint256 bet_value;    
     bool bet_check_creator;
     bool bet_check_player;
@@ -44,16 +44,6 @@ contract Lock {
     function getBalance() public view returns (uint) {
         return address(this).balance;
     }
-
-    function withdraw(uint256 amount) public {
-        require(address(this).balance >= amount, "Saldo del contratto insufficiente");
-        payable(msg.sender).transfer(amount);
-    }
-
-    function send() payable public {
-        //si prendono solo soldi soldi
-    }
-
 
     function new_game (address player) public {
         require(queue_games[msg.sender] == 0, "You already created a game");
@@ -113,7 +103,6 @@ contract Lock {
         emit player_joined(current_game.creator);  /* event for the creator that is waiting */
     }
 
-    //TODO add test for event gameID
     function join_random_game () public {
         require(queue_games[msg.sender] == 0, "You already created a game");
         require(random_queue_games[msg.sender] == 0, "You already created a game in the random queue");
@@ -122,12 +111,7 @@ contract Lock {
         uint index = it_random_queue_games.length -1;
         address creator = it_random_queue_games[index];
         uint256 current_game_id = random_queue_games[creator];
-        //console.log("DEBUGG");
-        //console.log(index);
-        //console.log("length: ");
-        //console.log(it_random_queue_games.length);
-        //console.log(current_game_id);
-        //console.log("------");
+
         Game memory current_game = games[current_game_id];
 
         random_queue_games[creator] = 0;     /* remove the game from the random queue */
@@ -148,7 +132,7 @@ contract Lock {
         require (msg.sender == current_game.creator || msg.sender == current_game.player, "you aren't a player of this game");
 
         if (option == 1) {
-            require(value != 0, "value isn't corret");
+            require(value != 0, "value isn't correct");
             current_game.state = 2; /* playing */
             current_game.bet_value = value; /* playing */
             games[gameID] = current_game;
@@ -161,19 +145,28 @@ contract Lock {
         }
     }
 
+    //function send() payable public {
+    //    //si prendono solo soldi soldi
+    //}
+
+    //function withdraw(uint256 amount) public {
+    //    require(address(this).balance >= amount, "Saldo del contratto insufficiente");
+    //    payable(msg.sender).transfer(amount);
+    //}
+
+
     //TODO: test
-    function send_money (uint256 gameID) external payable returns (uint256) {
+    function send_wei (uint256 gameID) public payable returns (uint256) {
         require(games[gameID].gameID != 0, "gameID isn't correct");
         uint256 amount_sent = 0;
         Game memory current_game = games[gameID];
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
 
-        (bool success,) = owner.call{value: msg.value}("");
-        require(success, "Failed to send money");
+        require(msg.value == current_game.bet_value, "please send the correct value");
+        require(current_game.state == 2, "the game state is incorrect");
+        //(bool success,) = owner.call{value: msg.value}("");
+        //require(success, "Failed to send money");
         amount_sent = msg.value;
-
-        //console.log("\n\nDEBUG");
-        //console.log(amount_sent);
 
         //TODO: manca ancora il controllo di quanto mandi
         if (msg.sender == current_game.creator) {
@@ -189,11 +182,12 @@ contract Lock {
 
     //TODO: test
     function get_bet_check (uint256 gameID) public view returns (bool) {
-        require(games[gameID].gameID != 0, "gameID isn't correct");
+        require(games[gameID].gameID != 0, "gameID");
 
         Game memory current_game = games[gameID];
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
-            
+        require(current_game.state == 2, "the game state is incorrect");
+        
         if (msg.sender == current_game.creator) {
             return current_game.bet_check_player;
         } else {

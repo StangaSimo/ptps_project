@@ -22,6 +22,8 @@ const { ethers, JsonRpcProvider } = require('ethers');
 const { start } = require('repl');
 let address_2_player;
 
+/* provider.getBalance is broken in etherjs with test network */
+
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 const abi = contractJson.abi;
@@ -291,13 +293,16 @@ async function startGame(gameID) {
 
 async function sendMoney(gameID, value) {
     const args = {value: ethers.utils.parseEther(value.toString())}
-    const reciept = await contract.send_money(gameID, args);
+    const transaction = await contract.send_wei(gameID, args);
+    const receipt = await transaction.wait();
 
-    //TODO: il check del while piu complicato
-    [creator, player] = await waitForBetCheck();
-    while ((creator != wallet.address) || (player != wallet.address))
-        [creator, player] = await waitForBetCheck();
-    console.log("I pagamenti sono stati effettuati" + reciept);
+    let bet_check =  await contract.get_bet_check(gameID);
+    while (bet_check != true) {
+        await sleep(1000);
+        bet_check =  await contract.get_bet_check(gameID);
+    }
+
+    console.log("Entrambi i player hanno depositato la scommessa");
 }
 
 async function startPlaying(gameID) {

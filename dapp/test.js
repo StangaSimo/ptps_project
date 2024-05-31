@@ -14,8 +14,9 @@ let url = "http://127.0.0.1:8545"
 let privateKey;
 
 if (process.env.DEBUG == '1') 
-        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
         privateKey = '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a';
+
+    //privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 
 if (process.env.DEBUG == '2') 
         privateKey = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
@@ -74,8 +75,8 @@ async function main() {
             [addr, option, value] = await waitForOffer();
         console.log("Il player ha accettato l'offerta di " + value.toString() + " wei");
 
-        args = {value: ethers.utils.parseEther(value.toString())}
-        const transaction = await contract.send_money(gameID, args); 
+        args = {value: value.toString()}
+        const transaction = await contract.send_wei(gameID, args); 
         const receipt = await transaction.wait();
         console.log("\n\nTransaction mined:"/* , receipt*/);
 
@@ -118,9 +119,9 @@ async function main() {
         console.log("Il creator del game offre: " + value.toString() + " wei, offerta accettata uscita");
         await contract.make_offer(gameID, 1, value);
 
-        args = {value: ethers.utils.parseEther(value.toString())}
+        args = {value: value.toString()}
 
-        const transaction = await contract.send_money(gameID, args);
+        const transaction = await contract.send_wei(gameID, args);
         const receipt = await transaction.wait();
         console.log("\n\nTransaction mined"/* receipt */);
 
@@ -140,9 +141,9 @@ async function main() {
 
 main().catch(console.error);
 
+/* address balance is broken in etherjs */
+
 async function  initial_setup(provider, wallet, ethers) {
-    await contract.withdraw(1000000);
-    console.log("presi soldi");
     const contract_balance = await provider.getBalance(contractAddress);
     console.log("Contract balance:" + contract_balance);
     wallet_balance = await wallet.getBalance();
