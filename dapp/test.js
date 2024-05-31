@@ -42,20 +42,49 @@ async function waitForRandomPlayer() {
     });
 }
 
+async function waitForPlayerCodeMaker() {
+    return new Promise(async (resolve) => {
+        contract.once("player_code_maker", (player, cm_or_cb) => {
+            resolve([player, cm_or_cb]);
+        });
+    });
+}
+
 const sleep = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function startPlaying(gameID, creator) {
+    console.log("Game iniziato");
+    let cm_or_cb;
+
+    if (creator) {
+
+        await sleep(300);
+        await contract.start_game(gameID); 
+        cm_or_cb = await contract.get_cm_or_cb(gameID); 
+
+    } else {
+
+        [addr, cm_or_cb] = await waitForPlayerCodeMaker();
+        while (addr != wallet.address)
+            [addr, cm_or_cb] = await waitForPlayerCodeMaker();
+    }
+
+    if (cm_or_cb == 1) { /* 1 = CM, 0 = CB */
+        console.log("Sei il CodeMaker\n ");
+        console.log( 
+    } else {
+        console.log("Sei il CodeBreaker\n");
+    }
+
+}
+
 
 async function main() {
     /* test function creator_client */
     if (process.env.DEBUG == '1') {
         console.log("debug Mode: Creator");
-
         await initial_setup(provider, wallet, ethers);
         initial_balance = await wallet.getBalance();
-
-        let random = await contract.start_game(3);
-        console.log("random = " + random.toString());
-        exit();
-
         await contract.new_game('0x0000000000000000000000000000000000000000'); /* new random game */
         let gameID = (await contract.get_gameid_byaddress()).toString();
         console.log("game creato con gameID " + gameID + " in attesa");
@@ -72,39 +101,33 @@ async function main() {
             [addr, option, value] = await waitForOffer();
         await sleep(100);
         console.log("Il player ha declinato, contro offerta di " + value);
-        await contract.make_offer(gameID, 2, 2000);
+        await contract.make_offer(gameID, 2, 20);
         console.log("Declinata e abbiamo controfferto 2000 wei, in attesa");
         [addr, option, value] = await waitForOffer();
         while (addr != wallet.address)
             [addr, option, value] = await waitForOffer();
         console.log("Il player ha accettato l'offerta di " + value.toString() + " wei");
-
         args = {value: value.toString()}
         const transaction = await contract.send_wei(gameID, args); 
         const receipt = await transaction.wait();
         console.log("\n\nTransaction mined:"/* , receipt*/);
-
-
         let bet_check =  await contract.get_bet_check(gameID);
         while (bet_check != true) {
             await sleep(1000);
             bet_check =  await contract.get_bet_check(gameID);
         }
-
         console.log("I pagamenti sono stati effettuati");
-
         await end_debug(provider, wallet, ethers, initial_balance);
+
+        await startPlaying(gameID, 1);
         exit(0);
     }
 
     /* test function player_client */
     if (process.env.DEBUG == '2') {
         console.log("debug Mode: Player");
-
         await initial_setup(provider, wallet, ethers);
-
         initial_balance = await wallet.getBalance();
-
         await contract.join_random_game();
         let gameID = (await contract.get_gameid_random_player()).toString();
         console.log("Game joinato con gameid " + gameID + " in attesa offerta");
@@ -122,28 +145,25 @@ async function main() {
         await sleep(100);
         console.log("Il creator del game offre: " + value.toString() + " wei, offerta accettata uscita");
         await contract.make_offer(gameID, 1, value);
-
         args = {value: value.toString()}
-
         const transaction = await contract.send_wei(gameID, args);
         const receipt = await transaction.wait();
         console.log("\n\nTransaction mined"/* receipt */);
-
         let bet_check =  await contract.get_bet_check(gameID);
         while (bet_check != true) {
             await sleep(1000);
             bet_check =  await contract.get_bet_check(gameID);
         }
-
         console.log("I pagamenti sono stati effettuati");
-
         await end_debug(provider, wallet, ethers, initial_balance);
-
+        
+        await startPlaying(gameID, 0);
         exit(0);
     }
 }
 
 main().catch(console.error);
+
 
 /* address balance is broken in etherjs */
 

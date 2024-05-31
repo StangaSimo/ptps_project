@@ -76,15 +76,21 @@ async function waitForOffer() {
     });
 }
 
-async function waitForBetCheck() {
+//async function waitForBetCheck() {
+//    return new Promise(async (resolve) => {
+//        contract.once("bet_check", (creator, player) => {
+//            resolve([creator, player]);
+//        });
+//    });
+//}
+
+async function waitForPlayerCodeMaker() {
     return new Promise(async (resolve) => {
-        contract.once("bet_check", (creator, player) => {
-            resolve([creator, player]);
+        contract.once("player_code_maker", (player, cm_or_cb) => {
+            resolve([player, cm_or_cb]);
         });
     });
 }
-
-
 
 async function waitForRandomPlayer() {
     return new Promise(async (resolve) => {
@@ -161,7 +167,7 @@ async function newGame() {
             break;
         default:
             console.log("Opzione non valida. Riprova.");
-            newGame();
+            await newGame();
     }
 
     let gameID = (await contract.get_gameid_byaddress(wallet.address)).toString();
@@ -183,7 +189,7 @@ async function newGame() {
     }
 
     console.log("Secondo player entrato");
-    startNewGame(gameID);
+    await startNewGame(gameID);
 }
 
 async function joinGame(gameID) {
@@ -191,7 +197,7 @@ async function joinGame(gameID) {
         try {
             await contract.join_random_game();
             let gameID = (await contract.get_gameid_random_player()).toString();
-            startGame(gameID);
+            await startGame(gameID);
         } catch (e) {
             console.log("Nessun game disponibile");
             exit(0)
@@ -199,7 +205,7 @@ async function joinGame(gameID) {
     } else {
         try {
             await contract.join_game(gameid);
-            startNewGame(gameID);
+            await startNewGame(gameID);
         } catch (e) {
             console.log("Errore ID");
             exit(0)
@@ -245,8 +251,8 @@ async function startNewGame(gameID) {
         }
     }
 
-    sendMoney(gameID, value);
-    startPlaying(gameID);
+    await sendMoney(gameID, value);
+    await startPlaying(gameID,1);
     exit(0);
 }
 
@@ -286,8 +292,8 @@ async function startGame(gameID) {
 
     }
 
-    sendMoney(gameID, value);
-    startPlaying(gameID);
+    await sendMoney(gameID, value);
+    await startPlaying(gameID,0);
     exit(0);
 }
 
@@ -305,10 +311,8 @@ async function sendMoney(gameID, value) {
     console.log("Entrambi i player hanno depositato la scommessa");
 }
 
-async function startPlaying(gameID) {
-    console.log("Game iniziato");
-     
-
+async function startPlaying(gameID, creator) {
+ 
 }
 
 

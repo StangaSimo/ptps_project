@@ -14,7 +14,7 @@ struct Game {
     uint256 bet_value;   /* bet value in wei */ 
     bool bet_check_creator; 
     bool bet_check_player;
-    uint8 code_maker;    /* 1: creator, 2: player*/
+    uint code_maker;    /* 0: creator, 1: player*/
     uint8 turns;  
     uint8 guesses_count; 
     
@@ -29,6 +29,7 @@ contract Lock {
     event player_joined (address player);
     event random_player_joined (address player);
     event offer_value (address player, uint8 option, uint256 value);
+    event player_code_maker (address player, uint8 cm);
 
     mapping (uint256 => Game) public games;                   /* list of all the games */
     mapping (address => uint256) public queue_games;          /* for checking if the player already uses a game */ 
@@ -203,31 +204,39 @@ contract Lock {
     }
 
     //TODO: test 
-    function start_game (uint256 gameID) public view returns (uint) {
-        //require(games[gameID].gameID != 0, "gameID"); //TODO: test 
-        //Game memory current_game = games[gameID];
+    function start_game (uint256 gameID) public  {
+        require(games[gameID].gameID != 0, "gameID"); //TODO: test 
+        Game memory current_game = games[gameID];
 
-        //require(current_game.state == 2, "the game state is incorrect");
-        //require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
+        require(current_game.state == 2, "the game state is incorrect");
+        require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
 
-        uint random_value = uint (keccak256(abi.encodePacked (msg.sender, block.timestamp, gameID)));
-        return random_value % 2; 
-          
+        uint random_value = uint (keccak256(abi.encodePacked (msg.sender, block.timestamp, gameID))); /* game id for random number */
 
-        //random_player
-        //function setNumber() external {
-        //    randNo= uint (keccak256(abi.encodePacked (msg.sender, block.timestamp, randNo)));
-        //}
-        //function getNumber() external view returns (uint) {
-        //    return randNo;
-        //} 
+        if ((random_value % 2) == 1) { /* creator start as CM, player as CB */
+            emit player_code_maker(current_game.player, 0);
+            current_game.code_maker = 1;
+        } else {
+            emit player_code_maker(current_game.player, 1);
+            current_game.code_maker = 0;
+        }
 
-
-
-
-         
-
+        games[gameID] = current_game;
     }
+
+    function get_cm_or_cb (uint256 gameID) public view returns (uint) {
+        require(games[gameID].gameID != 0, "gameID");
+        Game memory current_game = games[gameID];
+        require(msg.sender == current_game.creator,"you aren't the creator of this game");
+        return current_game.code_maker;
+    }
+
+    //TODO: funzione per ricezione segreto
+
+    //TODO: funzione per ricezione guess
+
+    //TODO: funzione per mandare guess
+
 
     //TODO: test
     function afk_checker (uint256 gameID) public returns (uint) {
