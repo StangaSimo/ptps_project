@@ -79,6 +79,9 @@ describe("Lock", function () {
             expect((await game).bet_value).to.equal(0);
             expect((await game).bet_check_player).to.equal(false);
             expect((await game).bet_check_creator).to.equal(false);
+            expect((await game).guesses_count).to.equal(0);
+            expect((await game).code_maker).to.equal(0);
+            expect((await game).turns).to.equal(0);
             expect(await lock.queue_games(owner.address)).to.equal(1);
             expect(await lock.random_queue_games(owner.address)).to.equal(0);
         });
@@ -381,6 +384,31 @@ describe("Lock", function () {
         });
     });
 
+    describe("start_game", function () {
+        //it("should return the correct bet check for creator", async function () {
+        //    const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
+        //    await lock.new_game(addr_0);
+        //    await lock.connect(otherAccount).join_random_game();
+        //    let option = 2;
+        //    let value = 100;
+        //    await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+        //    await lock.connect(otherAccount).make_offer(1,1,value);
+        //    const game = lock.games(1);
+        //    expect((await game).state).to.equal(2);
+        //    expect((await game).bet_value).to.equal(value);
+        //    await lock.send_wei(1,{value: value.toString()});
+        //    await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+        //    expect(await lock.get_bet_check(1)).to.equal(true);
+        //    expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+        //});
 
+        it("should revert for incorrect game ID", async function () {
+        });
+
+        it("should return false if one of the two didn't pay", async function () {
+        });
+
+
+    });
 
 });

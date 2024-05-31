@@ -11,9 +11,13 @@ struct Game {
     address player;      /* second player */
     bytes32[NT] secrets; /* all the hashes of the secrets */
     uint8 state;         /* 1: all player joined, 2: wait_for_bet, 3: startplaying 4:endturn, 5: endgame */
-    uint256 bet_value;    
-    bool bet_check_creator;
+    uint256 bet_value;   /* bet value in wei */ 
+    bool bet_check_creator; 
     bool bet_check_player;
+    uint8 code_maker;    /* 1: creator, 2: player*/
+    uint8 turns;  
+    uint8 guesses_count; 
+    
 }
 
 /* all struct are declared public for testing purpuses */
@@ -58,6 +62,10 @@ contract Lock {
         game.player = player; 
         game.bet_value = 0; 
         game.bet_check_player = false; 
+        game.bet_check_creator = false; 
+        game.guesses_count = 0; 
+        game.turns = 0; 
+        game.code_maker = 0; 
         game.bet_check_creator = false; 
 
         if (game.player == address(0)) {                  /* address(0) if has to wait for others to join in the random queue */
@@ -124,7 +132,6 @@ contract Lock {
         emit random_player_joined(current_game.creator); /* event for the creator that is waiting */
     }
 
-    //TODO: test
     function make_offer (uint256 gameID, uint8 option, uint256 value) public {
         require(games[gameID].gameID != 0, "gameID isn't correct");
         require(option == 1 || option == 2, "option isn't correct");
@@ -155,7 +162,6 @@ contract Lock {
     //}
 
 
-    //TODO: test
     function send_wei (uint256 gameID) public payable returns (uint256) {
         require(games[gameID].gameID != 0, "gameID isn't correct");
         uint256 amount_sent = 0;
@@ -164,11 +170,12 @@ contract Lock {
 
         require(msg.value == current_game.bet_value, "please send the correct value");
         require(current_game.state == 2, "the game state is incorrect");
+
         //(bool success,) = owner.call{value: msg.value}("");
         //require(success, "Failed to send money");
+
         amount_sent = msg.value;
 
-        //TODO: manca ancora il controllo di quanto mandi
         if (msg.sender == current_game.creator) {
             current_game.bet_check_creator = true;
         } else {
@@ -180,7 +187,6 @@ contract Lock {
         return amount_sent;
     }
 
-    //TODO: test
     function get_bet_check (uint256 gameID) public view returns (bool) {
         require(games[gameID].gameID != 0, "gameID");
 
@@ -195,6 +201,34 @@ contract Lock {
         }
          
     }
+
+    //TODO: test 
+    function start_game (uint256 gameID) public view returns (uint) {
+        //require(games[gameID].gameID != 0, "gameID"); //TODO: test 
+        //Game memory current_game = games[gameID];
+
+        //require(current_game.state == 2, "the game state is incorrect");
+        //require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
+
+        uint random_value = uint (keccak256(abi.encodePacked (msg.sender, block.timestamp, gameID)));
+        return random_value % 2; 
+          
+
+        //random_player
+        //function setNumber() external {
+        //    randNo= uint (keccak256(abi.encodePacked (msg.sender, block.timestamp, randNo)));
+        //}
+        //function getNumber() external view returns (uint) {
+        //    return randNo;
+        //} 
+
+
+
+
+         
+
+    }
+
     //TODO: test
     function afk_checker (uint256 gameID) public returns (uint) {
                  

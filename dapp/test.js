@@ -52,6 +52,10 @@ async function main() {
         await initial_setup(provider, wallet, ethers);
         initial_balance = await wallet.getBalance();
 
+        let random = await contract.start_game(3);
+        console.log("random = " + random.toString());
+        exit();
+
         await contract.new_game('0x0000000000000000000000000000000000000000'); /* new random game */
         let gameID = (await contract.get_gameid_byaddress()).toString();
         console.log("game creato con gameID " + gameID + " in attesa");
