@@ -242,6 +242,17 @@ describe("Lock", function () {
     });
   });
 
+  describe("send_money", function () {
+
+    it("SHOULD", async function () {
+      const { lock, otherAccount } = await loadFixture(deploy);
+      expect(await hre.ethers.provider.getBalance(lock.target)).to.equal(100_000_000);
+      await lock.connect(otherAccount).send({value: 100000});
+      expect(await hre.ethers.provider.getBalance(lock.target)).to.equal(100_000_000);
+    });
+
+  });
+
 
 
 

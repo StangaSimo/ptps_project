@@ -41,6 +41,20 @@ contract Lock {
         return allgameID++;
     }
 
+    function getBalance() public view returns (uint) {
+        return address(this).balance;
+    }
+
+    function withdraw(uint256 amount) public {
+        require(address(this).balance >= amount, "Saldo del contratto insufficiente");
+        payable(msg.sender).transfer(amount);
+    }
+
+    function send() payable public {
+        //si prendono solo soldi soldi
+    }
+
+
     function new_game (address player) public {
         require(queue_games[msg.sender] == 0, "You already created a game");
         require(random_queue_games[msg.sender] == 0, "You already created a random joined game");
@@ -108,12 +122,12 @@ contract Lock {
         uint index = it_random_queue_games.length -1;
         address creator = it_random_queue_games[index];
         uint256 current_game_id = random_queue_games[creator];
-        console.log("DEBUGG");
-        console.log(index);
-        console.log("length: ");
-        console.log(it_random_queue_games.length);
-        console.log(current_game_id);
-        console.log("------");
+        //console.log("DEBUGG");
+        //console.log(index);
+        //console.log("length: ");
+        //console.log(it_random_queue_games.length);
+        //console.log(current_game_id);
+        //console.log("------");
         Game memory current_game = games[current_game_id];
 
         random_queue_games[creator] = 0;     /* remove the game from the random queue */
@@ -148,7 +162,7 @@ contract Lock {
     }
 
     //TODO: test
-    function send_money (uint256 gameID) public payable returns (uint256) {
+    function send_money (uint256 gameID) external payable returns (uint256) {
         require(games[gameID].gameID != 0, "gameID isn't correct");
         uint256 amount_sent = 0;
         Game memory current_game = games[gameID];
@@ -158,8 +172,8 @@ contract Lock {
         require(success, "Failed to send money");
         amount_sent = msg.value;
 
-        console.log("\n\nDEBUG");
-        console.log(amount_sent);
+        //console.log("\n\nDEBUG");
+        //console.log(amount_sent);
 
         //TODO: manca ancora il controllo di quanto mandi
         if (msg.sender == current_game.creator) {
