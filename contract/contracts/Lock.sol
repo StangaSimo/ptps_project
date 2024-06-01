@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 import "hardhat/console.sol";
 
-uint constant NT = 3; /* number of turns */
-uint constant NG = 6; /* number of guesses */
+uint constant NT = 2; /* number of turns */
+uint constant NG = 3; /* number of guesses */
 
 struct Game {
     uint256 gameID;
@@ -16,7 +16,7 @@ struct Game {
     uint code_maker;    /* 0: creator, 1: player*/
     uint8 nt;  
     uint8 ng;  
-    uint256[NT] secrets; /* all the hashes of the secrets */
+    bytes32[NT] secrets; /* all the hashes of the secrets */
     string[NG][NT] guesses; /* solidity funziona al contrario */
     string[NG][NT] feedbacks; /* solidity funziona al contrario */
     uint8 guesses_count; 
@@ -50,7 +50,7 @@ contract Lock {
     }
 
     /* for testing */
-    function get_secret(uint256 gameID) public view returns (uint256[NT] memory) {
+    function get_secret(uint256 gameID) public view returns (bytes32[NT] memory) {
         require(games[gameID].gameID != 0, "gameID");
         return games[gameID].secrets;
     }
@@ -245,8 +245,6 @@ contract Lock {
             current_game.code_maker = 0;
         }
 
-        current_game.nt = 1;
-        current_game.ng = 1;
         games[gameID] = current_game;
     }
 
@@ -257,21 +255,21 @@ contract Lock {
         return current_game.code_maker;
     }
 
-    function send_secret (uint256 gameID, uint256 secret) public {
+    function send_secret (uint256 gameID, bytes32 secret) public {
         require(games[gameID].gameID != 0, "gameID");
 
         Game memory current_game = games[gameID];
 
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
+      
+        current_game.secrets[current_game.nt] = secret;
         
         if (msg.sender == current_game.creator) {
             require(current_game.code_maker == 1, "you're not suppose to send the secret"); 
-            current_game.secrets[current_game.nt] = secret;
             games[gameID] = current_game;
             emit secret_sent (current_game.player); 
         } else {
             require(current_game.code_maker == 0, "you're not suppose to send the secret"); 
-            current_game.secrets[current_game.nt] = secret;
             games[gameID] = current_game;
             emit secret_sent (current_game.creator); 
         }
@@ -284,14 +282,14 @@ contract Lock {
 
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
 
+        current_game.guesses[current_game.nt][current_game.ng] = guess;
+
         if (msg.sender == current_game.creator) {
             require(current_game.code_maker == 0, "you're not suppose to send the guess"); 
-            current_game.guesses[current_game.nt][current_game.ng] = guess;
             games[gameID] = current_game;
             emit guess_sent (current_game.player, guess);
         } else {
             require(current_game.code_maker == 1, "you're not suppose to send the guess"); 
-            current_game.guesses[current_game.nt][current_game.ng] = guess;
             games[gameID] = current_game;
             emit guess_sent (current_game.creator, guess);
         }
@@ -301,35 +299,62 @@ contract Lock {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
+        current_game.feedbacks[current_game.nt][current_game.ng] = feedback;
+        current_game.ng++;
 
         if (msg.sender == current_game.creator) {
-
-            current_game.feedbacks[current_game.nt][current_game.ng] = feedback;
-            require(current_game.code_maker == 0, "you're not suppose to send the feedback"); 
-            current_game.ng++;
+            require(current_game.code_maker == 1, "you're not suppose to send the feedback"); 
             games[gameID] = current_game;
             emit feed_back (current_game.player, feedback);
-
         } else {
-
-            require(current_game.code_maker == 1, "you're not suppose to send the feedback"); 
-            current_game.feedbacks[current_game.nt][current_game.ng] = feedback;
-            current_game.ng++;
+            require(current_game.code_maker == 0, "you're not suppose to send the feedback"); 
             games[gameID] = current_game;
             emit feed_back (current_game.creator, feedback);
-
         }   
-
     }
 
-
-
-    function end_turn (uint256 gameID) public {
-
+    function send_dispute (uint256 gameID, uint256 guess_number) public {
+        require(games[gameID].gameID != 0, "gameID");
+        Game memory current_game = games[gameID];
+        require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
         
+        if (msg.sender == current_game.creator) {
+            require(current_game.code_maker == 1, "you're not suppose to send the feedback"); 
+        } else {
+            require(current_game.code_maker == 0, "you're not suppose to send the feedback"); 
+        }
+
+
+        //TODO controllo guess
     }
 
+    function end_turn (uint256 gameID, string memory secret) public {
+        require(games[gameID].gameID != 0, "gameID");
+        Game memory current_game = games[gameID];
+        require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
+        current_game.nt++;
+        current_game.ng = 0;
+        
+        if (msg.sender == current_game.creator) {
+            require(current_game.code_maker == 1, "you're not suppose to end turn"); 
+        } else {
+            require(current_game.code_maker == 0, "you're not suppose to end turn"); 
+        }
+        bytes32 hash = keccak256(bytes(secret));
 
+        if (hash == current_game.secrets[current_game.nt-1]){
+            console.log("tutto bene");
+        } else {
+            console.log("tutto per il meglio");
+        }
+
+        //TODO check secret
+
+    }
+
+    function stop_the_game  (uint256 gameID, address winner) private {
+
+    }
 
     //TODO: test
     function afk_checker (uint256 gameID) public returns (uint) {
@@ -340,7 +365,6 @@ contract Lock {
     function end_game () public {
         
     }
-
 }
 
 

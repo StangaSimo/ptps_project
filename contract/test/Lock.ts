@@ -86,7 +86,7 @@ describe("Lock", function () {
             var secret = (await lock.get_secret(1));
 
             for (let i=0; i < 3; i++ )
-            expect(secret[i]).to.be.equals(0);
+                expect(secret[i]).to.be.equals("0x0000000000000000000000000000000000000000000000000000000000000000");
 
             var guesses = (await lock.get_guesses(1));
             var feedbacks = (await lock.get_feedbacks(1));
@@ -95,7 +95,6 @@ describe("Lock", function () {
                 for (let j=0; j < 6; j++) {
                     expect(guesses[i][j]).to.be.equals(" ");
                     expect(feedbacks[i][j]).to.be.equals(" ");
-
                 }
             }
 

@@ -1,17 +1,33 @@
+
+/********************************************+ new */
+/* AFK */
+import process from "process";
+
+function sideEffects() {
+  console.log("triggering downstream work of child");
+}
+
+/* CTRL - Z */
+process.on("SIGTSTP", () => sideEffects);
+
+
+//TODO: in ascolto per evento perditAAA
+
+/********************************************+ end new */
+
+
 const { exit } = require('process');
-//var readlineSync = require('readline-sync');
 const fs = require('fs');
 const path = require('path');
 const { ethers /* , JsonRpcProvider */ } = require('ethers');
-//const { start } = require('repl');
 
-//let address_2_player;
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 const abi = contractJson.abi;
 const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 let url = "http://127.0.0.1:8545"
 let privateKey;
+var readlineSync = require('readline-sync');
 
 if (process.env.DEBUG == '1') 
         privateKey = '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a';
@@ -34,6 +50,7 @@ async function waitForOffer() {
     });
 }
 
+/********************************************+ new */
 async function waitForSecret() {
     return new Promise(async (resolve) => {
         contract.once("secret_sent", (address) => {
@@ -50,6 +67,16 @@ async function waitForGuess() {
     });
 }
 
+async function waitForEndTurn() {
+    return new Promise(async (resolve) => {
+        contract.once("end_turn", (address, secret) => {
+            resolve([address, secret]);
+        });
+    });
+}
+
+
+
 async function waitForFeedBack() {
     return new Promise(async (resolve) => {
         contract.once("feed_back", (address, feedback) => {
@@ -57,6 +84,7 @@ async function waitForFeedBack() {
         });
     });
 }
+/********************************************+ end new */
 
 async function waitForRandomPlayer() {
     return new Promise(async (resolve) => {
@@ -73,6 +101,8 @@ async function waitForPlayerCodeMaker() {
         });
     });
 }
+
+/********************************************+ end new */
 
 const sleep = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -94,32 +124,47 @@ async function startPlaying(gameID, creator) {
     }
 
     turni = 0;
-    while (turni < 3 /*TODO: NT */) {
+    while (turni < 2 /*TODO: NT */) {
 
         if (cm_or_cb == 1) { /* 1 = CM, 0 = CB */
             console.log("Sei il CodeMaker\n ");
-            console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\mo = orange\nv = violet\nr = red\ny = yellow\n\n");
+            console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\no = orange\nv = violet\nr = red\ny = yellow\n\n");
 
             let secret = readlineSync.question("Input: ");
 
-            while (!validateInput(secret)) 
+            while (!validateGuess(secret)) 
                 secret = readlineSync.question("Input errato, riprovare: ");
 
-            let hash = utils.keccak256(utils.toUtf8Bytes(secret));
+            let hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(secret));
 
-            await lock.send_secret(gameID, hash);
+            await contract.send_secret(gameID, hash);
 
-            for (let i=0; i<6 /*TODO:NT*/; i++) {
+            for (let i=0; i<3 /*TODO:NT*/; i++) {
 
                 [addr, guess] = await waitForGuess();
                 while (addr != wallet.address)
                     [addr, guess] = await waitForGuess();
+                
+                console.log("Guess: " + guess);
+                console.log("\n\nScrivi il feedback: \n\nO = Colore e Posizione corretta\nX = Colore corretto e posizione non corretta\no = sbagliato\n\n");
 
+                let feedback = readlineSync.question("Input: ");
+
+                while (!validateFeedback(feedback)) 
+                    feedback = readlineSync.question("Input errato, riprovare: ");
+
+                await contract.send_feedback(gameID, feedback);
             }
+
+            cm_or_cb = 0;
             
+            await contract.end_turn(gameID, secret);
+
+            //wait tempo disputa
+
         } else {
 
-            console.log("Sei il CodeBreaker\n");
+            console.log("Sei il CodeBreaker, in attesa del segreto...\n");
 
             [addr] = await waitForSecret();
             while (addr != wallet.address)
@@ -127,37 +172,60 @@ async function startPlaying(gameID, creator) {
 
             console.log("Il CodeMaker ha depositato il segreto\n");
 
-            for (let i=0; i<6; i++) {
-                console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\mo = orange\nv = violet\nr = red\ny = yellow\n\n");
+            for (let i=0; i<3; i++) {
+                console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\no = orange\nv = violet\nr = red\ny = yellow\n\n");
 
                 let guess = readlineSync.question("Input: ");
 
-                while (!validateInput(guess)) 
+                while (!validateGuess(guess)) 
                     guess = readlineSync.question("Input errato, riprovare: ");
                 
-                await lock.send_guess(gameDI, guess);
+                await contract.send_guess(gameID, guess);
 
-                [addr] = await waitForFeedBack();
+                [addr, feedback] = await waitForFeedBack();
                 while (addr != wallet.address)
-                    [addr] = await waitForFeedBack();
-                
+                    [addr, feedback] = await waitForFeedBack();
+
+                console.log("Feedback: " + feedback);
             }
 
-                       
+            //TODO wait for end turn
+            console.log("Turno finito\n ");
+            console.log("Avviare una Disputa?\n ");
+            let check = readlineSync.question("y/n: ");
+            if (check == "y") {
+                console.log("Su quale guess?");
+                let number_guess = readlineSync.question("Inserisci il numero: ");
+                await contract.send_dispute(gameID, number_guess);
+            }
+
+            cm_or_cb = 1;
         }
+
         turni++;
-        cm_or_cb = !cm_or_cb;
         //end turn
     }
+    
+    console.log("esco\n");
 }
 
-function validateInput(input) {
+function validateGuess(input) {
     if (input.length !== 4) {
         return false;
     }
-    const validChars = /^[bgavry]+$/;
+    const validChars = /^[bgovry]+$/;
+
     return validChars.test(input);
 }
+
+function validateFeedback(input) {
+    if (input.length !== 4) {
+        return false;
+    }
+    const validChars = /^[OXo]+$/;
+    return validChars.test(input);
+}
+/********************************************+ end new */
 
 async function main() {
     /* test function creator_client */
