@@ -3,10 +3,17 @@ import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-gas-reporter"
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.24",
-  gasReporter: {
-    enabled: (process.env.REPORT_GAS == "1") ? true : false
-  }
+    solidity: {
+        version: "0.8.24",
+        settings: {
+            optimizer: {
+                enabled: true,
+            },
+        },
+    },
+    gasReporter: {
+        enabled: (process.env.REPORT_GAS == "1") ? true : false
+    }
 };
 
 export default config;

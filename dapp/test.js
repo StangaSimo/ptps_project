@@ -34,6 +34,30 @@ async function waitForOffer() {
     });
 }
 
+async function waitForSecret() {
+    return new Promise(async (resolve) => {
+        contract.once("secret_sent", (address) => {
+            resolve([address]);
+        });
+    });
+}
+
+async function waitForGuess() {
+    return new Promise(async (resolve) => {
+        contract.once("guess_sent", (address, guess) => {
+            resolve([address, guess]);
+        });
+    });
+}
+
+async function waitForFeedBack() {
+    return new Promise(async (resolve) => {
+        contract.once("feed_back", (address, feedback) => {
+            resolve([address, feedback]);
+        });
+    });
+}
+
 async function waitForRandomPlayer() {
     return new Promise(async (resolve) => {
         contract.once("random_player_joined", (addr) => {
@@ -69,15 +93,71 @@ async function startPlaying(gameID, creator) {
             [addr, cm_or_cb] = await waitForPlayerCodeMaker();
     }
 
-    if (cm_or_cb == 1) { /* 1 = CM, 0 = CB */
-        console.log("Sei il CodeMaker\n ");
-        console.log( 
-    } else {
-        console.log("Sei il CodeBreaker\n");
-    }
+    turni = 0;
+    while (turni < 3 /*TODO: NT */) {
 
+        if (cm_or_cb == 1) { /* 1 = CM, 0 = CB */
+            console.log("Sei il CodeMaker\n ");
+            console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\mo = orange\nv = violet\nr = red\ny = yellow\n\n");
+
+            let secret = readlineSync.question("Input: ");
+
+            while (!validateInput(secret)) 
+                secret = readlineSync.question("Input errato, riprovare: ");
+
+            let hash = utils.keccak256(utils.toUtf8Bytes(secret));
+
+            await lock.send_secret(gameID, hash);
+
+            for (let i=0; i<6 /*TODO:NT*/; i++) {
+
+                [addr, guess] = await waitForGuess();
+                while (addr != wallet.address)
+                    [addr, guess] = await waitForGuess();
+
+            }
+            
+        } else {
+
+            console.log("Sei il CodeBreaker\n");
+
+            [addr] = await waitForSecret();
+            while (addr != wallet.address)
+                [addr] = await waitForSecret();
+
+            console.log("Il CodeMaker ha depositato il segreto\n");
+
+            for (let i=0; i<6; i++) {
+                console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\mo = orange\nv = violet\nr = red\ny = yellow\n\n");
+
+                let guess = readlineSync.question("Input: ");
+
+                while (!validateInput(guess)) 
+                    guess = readlineSync.question("Input errato, riprovare: ");
+                
+                await lock.send_guess(gameDI, guess);
+
+                [addr] = await waitForFeedBack();
+                while (addr != wallet.address)
+                    [addr] = await waitForFeedBack();
+                
+            }
+
+                       
+        }
+        turni++;
+        cm_or_cb = !cm_or_cb;
+        //end turn
+    }
 }
 
+function validateInput(input) {
+    if (input.length !== 4) {
+        return false;
+    }
+    const validChars = /^[bgavry]+$/;
+    return validChars.test(input);
+}
 
 async function main() {
     /* test function creator_client */

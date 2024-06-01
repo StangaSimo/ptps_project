@@ -81,7 +81,25 @@ describe("Lock", function () {
             expect((await game).bet_check_creator).to.equal(false);
             expect((await game).guesses_count).to.equal(0);
             expect((await game).code_maker).to.equal(0);
-            expect((await game).turns).to.equal(0);
+            expect((await game).nt).to.equal(0);
+            expect((await game).ng).to.equal(0);
+            var secret = (await lock.get_secret(1));
+
+            for (let i=0; i < 3; i++ )
+            expect(secret[i]).to.be.equals(0);
+
+            var guesses = (await lock.get_guesses(1));
+            var feedbacks = (await lock.get_feedbacks(1));
+
+            for (let i=0; i < 3; i++ ){
+                for (let j=0; j < 6; j++) {
+                    expect(guesses[i][j]).to.be.equals(" ");
+                    expect(feedbacks[i][j]).to.be.equals(" ");
+
+                }
+            }
+
+
             expect(await lock.queue_games(owner.address)).to.equal(1);
             expect(await lock.random_queue_games(owner.address)).to.equal(0);
         });

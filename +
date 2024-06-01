@@ -9,22 +9,20 @@ struct Game {
     uint256 gameID;
     address creator;     /* first player */
     address player;      /* second player */
+    uint256[NT] secrets; /* all the hashes of the secrets */
     uint8 state;         /* 1: all player joined, 2: wait_for_bet, 3: startplaying 4:endturn, 5: endgame */
     uint256 bet_value;   /* bet value in wei */ 
     bool bet_check_creator; 
     bool bet_check_player;
     uint code_maker;    /* 0: creator, 1: player*/
-    uint8 nt;  
-    uint8 ng;  
-    uint256[NT] secrets; /* all the hashes of the secrets */
-    string[NG][NT] guesses; /* solidity funziona al contrario */
-    string[NG][NT] feedbacks; /* solidity funziona al contrario */
+    uint8 NT;  
+    uint8 NG;  
+    string[NT][NG] guesses;
     uint8 guesses_count; 
+    
 }
 
 /* all struct are declared public for testing purpuses */
-        
-// TODO RIMUVOVERE TUTTI I REQUIRE PER FUNZIONI SOLO VIEW
 
 contract Lock {
     uint256 public allgameID;     /* all games id come from this coutner */
@@ -34,9 +32,6 @@ contract Lock {
     event random_player_joined (address player);
     event offer_value (address player, uint8 option, uint256 value);
     event player_code_maker (address player, uint8 cm);
-    event secret_sent (address player); 
-    event feed_back (address player, string feedback); 
-    event guess_sent (address player, string guess); 
 
     mapping (uint256 => Game) public games;                   /* list of all the games */
     mapping (address => uint256) public queue_games;          /* for checking if the player already uses a game */ 
@@ -48,25 +43,6 @@ contract Lock {
         allgameID = 1;
         owner = payable(msg.sender);
     }
-
-    /* for testing */
-    function get_secret(uint256 gameID) public view returns (uint256[NT] memory) {
-        require(games[gameID].gameID != 0, "gameID");
-        return games[gameID].secrets;
-    }
-
-    /* for testing */
-    function get_guesses(uint256 gameID) public view returns (string[NG][NT] memory) {
-        require(games[gameID].gameID != 0, "gameID");
-        return games[gameID].guesses;
-    }
-
-    /* for testing */
-    function get_feedbacks(uint256 gameID) public view returns (string[NG][NT] memory) {
-        require(games[gameID].gameID != 0, "gameID");
-        return games[gameID].feedbacks;
-    }
-
 
     function get_gameid () public returns (uint) {
         return allgameID++;
@@ -91,15 +67,13 @@ contract Lock {
         game.bet_check_player = false; 
         game.bet_check_creator = false; 
         game.guesses_count = 0; 
-        game.nt = 0; 
-        game.ng = 0; 
+        game.NT = 0; 
+        game.NG = 0; 
         game.code_maker = 0; 
-
+        game.bet_check_creator = false; 
         for (uint32 i=0; i < NT; i++ )
-            for (uint32 j=0; j < NG; j++) {
+            for (uint32 j=0; j < NG; j++)
                 game.guesses[i][j] = " ";
-                game.feedbacks[i][j] = " ";
-            }
 
         if (game.player == address(0)) {                  /* address(0) if has to wait for others to join in the random queue */
             it_random_queue_games.push(msg.sender);
@@ -185,6 +159,10 @@ contract Lock {
         }
     }
 
+    //function send() payable public {
+    //    //si prendono solo soldi soldi
+    //}
+
     //function withdraw(uint256 amount) public {
     //    require(address(this).balance >= amount, "Saldo del contratto insufficiente");
     //    payable(msg.sender).transfer(amount);
@@ -199,6 +177,10 @@ contract Lock {
 
         require(msg.value == current_game.bet_value, "please send the correct value");
         require(current_game.state == 2, "the game state is incorrect");
+
+        //(bool success,) = owner.call{value: msg.value}("");
+        //require(success, "Failed to send money");
+
         amount_sent = msg.value;
 
         if (msg.sender == current_game.creator) {
@@ -245,8 +227,8 @@ contract Lock {
             current_game.code_maker = 0;
         }
 
-        current_game.nt = 1;
-        current_game.ng = 1;
+        current_game.NT = 1;
+        current_game.NG = 1;
         games[gameID] = current_game;
     }
 
@@ -257,24 +239,23 @@ contract Lock {
         return current_game.code_maker;
     }
 
+
     function send_secret (uint256 gameID, uint256 secret) public {
         require(games[gameID].gameID != 0, "gameID");
 
         Game memory current_game = games[gameID];
 
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
+
         
         if (msg.sender == current_game.creator) {
             require(current_game.code_maker == 1, "you're not suppose to send the secret"); 
-            current_game.secrets[current_game.nt] = secret;
-            games[gameID] = current_game;
-            emit secret_sent (current_game.player); 
         } else {
             require(current_game.code_maker == 0, "you're not suppose to send the secret"); 
-            current_game.secrets[current_game.nt] = secret;
-            games[gameID] = current_game;
-            emit secret_sent (current_game.creator); 
         }
+        
+        current_game.secrets[current_game.NT] = secret;
+        games[gameID] = current_game;
     }
 
     function send_guess (uint256 gameID, string memory guess) public {
@@ -286,47 +267,19 @@ contract Lock {
 
         if (msg.sender == current_game.creator) {
             require(current_game.code_maker == 0, "you're not suppose to send the guess"); 
-            current_game.guesses[current_game.nt][current_game.ng] = guess;
-            games[gameID] = current_game;
-            emit guess_sent (current_game.player, guess);
         } else {
             require(current_game.code_maker == 1, "you're not suppose to send the guess"); 
-            current_game.guesses[current_game.nt][current_game.ng] = guess;
-            games[gameID] = current_game;
-            emit guess_sent (current_game.creator, guess);
         }
-    }
-
-    function send_feedback (uint256 gameID, string memory feedback) public {
-        require(games[gameID].gameID != 0, "gameID");
-        Game memory current_game = games[gameID];
-        require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
-
-        if (msg.sender == current_game.creator) {
-
-            current_game.feedbacks[current_game.nt][current_game.ng] = feedback;
-            require(current_game.code_maker == 0, "you're not suppose to send the feedback"); 
-            current_game.ng++;
-            games[gameID] = current_game;
-            emit feed_back (current_game.player, feedback);
-
-        } else {
-
-            require(current_game.code_maker == 1, "you're not suppose to send the feedback"); 
-            current_game.feedbacks[current_game.nt][current_game.ng] = feedback;
-            current_game.ng++;
-            games[gameID] = current_game;
-            emit feed_back (current_game.creator, feedback);
-
-        }   
-
-    }
-
-
-
-    function end_turn (uint256 gameID) public {
-
         
+        require(guess.length == 4, "guess isn't correct");
+
+        current_game.guesses[current_game.NT][current_game.NG] = guess;
+        current_game.NG++;
+
+        games[gameID] = current_game;
+    }
+    
+    function end_turn (uint256 gameID, string guess) public {
     }
 
 

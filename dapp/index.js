@@ -300,7 +300,7 @@ async function startGame(gameID) {
 async function sendMoney(gameID, value) {
     const args = {value: ethers.utils.parseEther(value.toString())}
     const transaction = await contract.send_wei(gameID, args);
-    const receipt = await transaction.wait();
+    await transaction.wait();
 
     let bet_check =  await contract.get_bet_check(gameID);
     while (bet_check != true) {
@@ -312,7 +312,36 @@ async function sendMoney(gameID, value) {
 }
 
 async function startPlaying(gameID, creator) {
- 
+    console.log("Game iniziato");
+    let cm_or_cb;
+
+    if (creator) {
+
+        await sleep(300);
+        await contract.start_game(gameID); 
+        cm_or_cb = await contract.get_cm_or_cb(gameID); 
+
+    } else {
+
+        [addr, cm_or_cb] = await waitForPlayerCodeMaker();
+        while (addr != wallet.address)
+            [addr, cm_or_cb] = await waitForPlayerCodeMaker();
+    }
+
+    if (cm_or_cb == 1) { /* 1 = CM, 0 = CB */
+        console.log("Sei il CodeMaker\n ");
+        //fai il segreto
+        //aspetta la guessa
+        //fai la correzione
+        //cosi per tutti i turni 
+    } else {
+        console.log("Sei il CodeBreaker\n");
+        // wait CodeMaker
+        // fai la mossa
+        // aspetta la ricezioen
+    }
+
+
 }
 
 

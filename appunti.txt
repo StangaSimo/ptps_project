@@ -3,12 +3,23 @@ pure o view per mandare i valori senza creare una transazione nella block chain 
 event sono molto piu cheap di gas rispetto alle function call. 
 
 
+B = BLUE 
+G = GREEN 
+A = ORANGE 
+V = VIOLET 
+R = RED 
+Y = YELLOW 
+
+
+
+
+
 
 RULES: 
     CB = Code Breaker quello che guessa 
     CM = Code Maker quello che fa 
 
-     - il CM fa una sequenza di N colors CS =(c1,c2, …, cn) da un set di M color, con ripetizioni. 
+     - il CM fa una sequenza di N colors CS = (c1,c2, …, cn) da un set di M color, con ripetizioni. 
      - il codebreaker prova a indovinare dando una N di combinazioni dei M (g1 ,g2 ,..., gn ). 
 
     Dopo ogni guest il CM risponde con due numeri :
@@ -57,3 +68,7 @@ IMPL:
     - 2 opzioni per entrare in un game gia creato, il gioco viene scelto dallo smart contract a random, oppure il creatore del game specifica l'id etherium del user con cui vuole giocare, allora gli manda il game id e lo smart contract controlla che i due possano giocare insieme.
     - quando i due player sono in opartita, il contratto emette un evento che avvisa i player che il gioco può iniziare, allora le due parti decidono i soldi da committare. 
     - the smart contract stores all state information about all games, such as the address of the creator of the game, the current phase of the game, the hash of the secret, and so on… 
+
+
+
+
