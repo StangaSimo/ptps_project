@@ -11,6 +11,11 @@ const config: HardhatUserConfig = {
             },
         },
     },
+    networks: {
+         hardhat:{
+            allowUnlimitedContractSize: true,
+         },
+    },
     gasReporter: {
         enabled: (process.env.REPORT_GAS == "1") ? true : false
     }

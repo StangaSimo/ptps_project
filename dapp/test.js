@@ -102,8 +102,6 @@ async function waitForPlayerCodeMaker() {
     });
 }
 
-/********************************************+ end new */
-
 const sleep = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function startPlaying(gameID, creator) {

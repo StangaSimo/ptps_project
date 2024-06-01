@@ -20,11 +20,8 @@ struct Game {
     string[NG] secrets; /* all the hashes of the secrets */
     string[NG][NT] guesses; /* solidity funziona al contrario */
     string[NG][NT] feedbacks; /* solidity funziona al contrario */
-    uint8[2] false_accusation; 
-    uint8[2] dispute; 
-    
-    /* 0 for creator and 1 for player, if one player have more than 1 the game is lost, 
-        if the codemaker make more than one error than the game is lost */
+    uint8 guesses_count; 
+    uint8[2] dispute;  /* 0 for creator and 1 for player, if one player have more than 1 the game is lost */
 }
 
 /* all struct are declared public for testing purpuses */
@@ -82,16 +79,6 @@ contract Lock {
     }
 
     function new_game (address player) public {
-
-        //string memory a = "O";
-        //string memory b = "X";
-        //string memory c = "o";
-        //bytes memory bb = bytes("OX");
-        //bytes memory aa = bytes("OuX");
-
-        //if (aa[2] == bb[1]) 
-        //    console.log("aaaaaaaaaaaaaa ");
-
         require(queue_games[msg.sender] == 0, "You already created a game");
         require(random_queue_games[msg.sender] == 0, "You already created a random joined game");
 
@@ -104,14 +91,11 @@ contract Lock {
         game.bet_value = 0; 
         game.bet_check_player = false; 
         game.bet_check_creator = false; 
+        game.guesses_count = 0; 
         game.nt = 0; 
         game.ng = 0; 
         game.code_maker = 0; 
         game.secret = 0; 
-        game.false_accusation[0] = 0;
-        game.false_accusation[1] = 0;
-        game.dispute[0] = 0;
-        game.dispute[1] = 0;
 
         for (uint32 i=0; i < NT; i++ ){
             game.secrets[i] = " "; 
@@ -339,35 +323,17 @@ contract Lock {
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
         
         if (msg.sender == current_game.creator) {
-            require(current_game.code_maker == 1, "you're not suppose to send the dispute"); 
+            require(current_game.code_maker == 1, "you're not suppose to send the feedback"); 
         } else {
-            require(current_game.code_maker == 0, "you're not suppose to send the dispute"); 
+            require(current_game.code_maker == 0, "you're not suppose to send the feedback"); 
         }
             
-        
-        bytes memory guess = bytes(current_game.guesses[current_game.nt-1][guess_number]);
-        bytes memory feedback = bytes(current_game.feedbacks[current_game.nt-1][guess_number]);
-        bytes memory secret = bytes(current_game.secrets[current_game.nt-1]);
-        bytes memory check = bytes("OXo");
-        uint8 errors = 0;
+        string memory guess = current_game.guesses[current_game.nt-1][guess_number];
+        string memory feed_back = current_game.feedbacks[current_game.nt-1][guess_number];
+        string memory secret = current_game.secrets[current_game.nt-1];
 
-        for (uint i=0; i<4; i++) 
-            if (guess[i] == secret[i])
-                if (feedback[i] != check[0]) 
-                   errors++; 
-            else 
-                for (uint j=0; j<4; j++) 
-                    if (i != j) 
-                        if (guess[i] == secret[j])
-                            if (feedback[i] != check[1]) 
-                                errors++;
-         
+        for (
 
-        //if (error >= 2) 
-            //The game is lost
-        //if (error >= 1)  greve 
-        //if (error == 0)  false accusation 
-            
     }
 
     function end_turn (uint256 gameID, string memory secret) public {
@@ -382,7 +348,6 @@ contract Lock {
         } else {
             require(current_game.code_maker == 0, "you're not suppose to end turn"); 
         }
-
         bytes32 hash = keccak256(bytes(secret));
 
         if (hash == current_game.secret){
@@ -394,7 +359,6 @@ contract Lock {
         current_game.secrets[current_game.nt-1] = secret;
 
         games[gameID] = current_game;
-
         //TODO check secret
 
     }
