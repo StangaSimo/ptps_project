@@ -158,6 +158,7 @@ async function startPlaying(gameID, creator) {
             
             await contract.end_turn(gameID, secret);
 
+            //TODO: mettere vincita 
             //wait tempo disputa
 
         } else {
@@ -187,7 +188,6 @@ async function startPlaying(gameID, creator) {
                 console.log("Feedback: " + feedback);
             }
 
-            //TODO wait for end turn
             console.log("Turno finito\n ");
             console.log("Avviare una Disputa?\n ");
             let check = readlineSync.question("y/n: ");
