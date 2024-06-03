@@ -810,4 +810,230 @@ describe("Lock", function () {
         });    
 
     });    
+
+
+    describe("send_dispute", function () {
+
+        it("should send the dispute for 1 error to the CM", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+
+            const hash_0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            const guess_00 = "byrr";
+            const guess_01 = "bgrr"; /* guess dispute */
+            const guess_02 = "bbrr";
+            const feedback_00 = "Oooo";
+            const feedback_01 = "OXoo";
+            const feedback_02 = "OXXo";
+
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+
+                await expect(await lock.send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_0);        
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(owner.address, guess_00);
+                await expect(await lock.send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_00);
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_01);
+                await expect(await lock.send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_01);
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_02);
+                await expect(await lock.send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_02);
+                await lock.end_turn(1,"bgov");
+                await expect(await lock.connect(otherAccount).send_dispute(1,2)).to.emit(lock,"dispute").withArgs(owner.address,1); /* 1 error */
+                expect(await lock.connect(otherAccount).view_dispute(1)).to.equal(1);
+
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(3);
+                expect(points[1]).to.equal(0);
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_0);        
+                await expect(await lock.send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_00);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_00);
+                await expect(await lock.send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_01);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_01);
+                await expect(await lock.send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_02);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_02);
+                await lock.connect(otherAccount).end_turn(1,"bgov");
+
+                await expect(await lock.send_dispute(1,2)).to.emit(lock,"dispute").withArgs(otherAccount.address,1); /* 1 error */
+                expect(await lock.view_dispute(1)).to.equal(1);
+
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(0);
+                expect(points[1]).to.equal(3);
+            }
+
+            let guess = (await lock.get_guesses(1));
+            let feedbacks = (await lock.get_feedbacks(1));
+            expect(guess[0][0]).to.equal(guess_00);
+            expect(guess[0][1]).to.equal(guess_01);
+            expect(guess[0][2]).to.equal(guess_02);
+            expect(feedbacks[0][0]).to.equal(feedback_00);
+            expect(feedbacks[0][1]).to.equal(feedback_01);
+            expect(feedbacks[0][2]).to.equal(feedback_02);
+
+       });    
+
+
+       it("should send the dispute for 2 error to the CM and stop the game in favor of the CB", async function () {
+           const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+           await lock.new_game(addr_0);
+           await lock.connect(otherAccount).join_random_game();
+           let option = 2;
+           let value = 100;
+           await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+           await lock.connect(otherAccount).make_offer(1,1,value);
+           await lock.send_wei(1,{value: value.toString()});
+           await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+           expect(await lock.get_bet_check(1)).to.equal(true);
+           expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+           await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+
+           const hash_0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+           const guess_00 = "byrr";
+           const guess_01 = "bgrr"; /* guess dispute */
+           const guess_02 = "bbrr";
+           const feedback_00 = "oooo";
+           const feedback_01 = "XXoo"; /* 2 error */
+           const feedback_02 = "OXXo";
+
+           let cm = (await lock.games(1)).code_maker;
+           if (cm == BigInt(0)) { /* lock cm */
+
+               await expect(await lock.send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+           expect((await lock.games(1)).secret).to.equal(hash_0);        
+           await expect(await lock.connect(otherAccount).send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(owner.address, guess_00);
+           await expect(await lock.send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_00);
+           await expect(await lock.connect(otherAccount).send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_01);
+           await expect(await lock.send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_01);
+           await expect(await lock.connect(otherAccount).send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_02);
+           await expect(await lock.send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_02);
+           await lock.end_turn(1,"bgov");
+           await expect(await lock.connect(otherAccount).send_dispute(1,2)).to.emit(lock,"stop_the_game_event")
+                .withArgs(1,otherAccount.address,owner.address); /* 2 error */
+           expect(await lock.connect(otherAccount).view_dispute(1)).to.equal(3);
+
+           let points = (await lock.get_points(1));
+           expect(points[0]).to.equal(3);
+           expect(points[1]).to.equal(0);
+
+           } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+               await expect(await lock.connect(otherAccount).send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+           expect((await lock.games(1)).secret).to.equal(hash_0);        
+           await expect(await lock.send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_00);
+           await expect(await lock.connect(otherAccount).send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_00);
+           await expect(await lock.send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_01);
+           await expect(await lock.connect(otherAccount).send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_01);
+           await expect(await lock.send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_02);
+           await expect(await lock.connect(otherAccount).send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_02);
+           await lock.connect(otherAccount).end_turn(1,"bgov");
+
+           await expect(await lock.send_dispute(1,2)).to.emit(lock,"stop_the_game_event")
+                .withArgs(1,owner.address,otherAccount.address); /* 2 error */
+           expect(await lock.view_dispute(1)).to.equal(3);
+
+           let points = (await lock.get_points(1));
+           expect(points[0]).to.equal(0);
+           expect(points[1]).to.equal(3);
+           }
+
+           let guess = (await lock.get_guesses(1));
+           let feedbacks = (await lock.get_feedbacks(1));
+           expect(guess[0][0]).to.equal(guess_00);
+           expect(guess[0][1]).to.equal(guess_01);
+           expect(guess[0][2]).to.equal(guess_02);
+           expect(feedbacks[0][0]).to.equal(feedback_00);
+           expect(feedbacks[0][1]).to.equal(feedback_01);
+           expect(feedbacks[0][2]).to.equal(feedback_02);
+
+       });    
+
+        it("should send dispute for 1 false accusation to the CB", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+
+            const hash_0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            const guess_00 = "byrr";
+            const guess_01 = "bgvr"; /* guess dispute */
+            const guess_02 = "bbrr";
+            const feedback_00 = "Oooo";
+            const feedback_01 = "OOXo"; /* 0 error */
+            const feedback_02 = "OXXo";
+
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+
+                await expect(await lock.send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_0);        
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(owner.address, guess_00);
+                await expect(await lock.send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_00);
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_01);
+                await expect(await lock.send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_01);
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_02);
+                await expect(await lock.send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_02);
+                await lock.end_turn(1,"bgov");
+                await expect(await lock.connect(otherAccount).send_dispute(1,2)).to.emit(lock,"dispute").withArgs(owner.address,2); /* 1 error */
+                expect(await lock.connect(otherAccount).view_dispute(1)).to.equal(2);
+
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(3);
+                expect(points[1]).to.equal(0);
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_0);        
+                await expect(await lock.send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_00);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_00);
+                await expect(await lock.send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_01);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_01);
+                await expect(await lock.send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_02);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_02);
+                await lock.connect(otherAccount).end_turn(1,"bgov");
+
+                await expect(await lock.send_dispute(1,2)).to.emit(lock,"dispute").withArgs(otherAccount.address,2); /* 1 error */
+                expect(await lock.view_dispute(1)).to.equal(2);
+
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(0);
+                expect(points[1]).to.equal(3);
+            }
+
+            let guess = (await lock.get_guesses(1));
+            let feedbacks = (await lock.get_feedbacks(1));
+            expect(guess[0][0]).to.equal(guess_00);
+            expect(guess[0][1]).to.equal(guess_01);
+            expect(guess[0][2]).to.equal(guess_02);
+            expect(feedbacks[0][0]).to.equal(feedback_00);
+            expect(feedbacks[0][1]).to.equal(feedback_01);
+            expect(feedbacks[0][2]).to.equal(feedback_02);
+
+       });    
+
+
+
+    }); 
 });

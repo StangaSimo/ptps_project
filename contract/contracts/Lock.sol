@@ -77,6 +77,10 @@ contract Lock {
         return games[gameID].feedbacks;
     }
 
+    function get_dispute(uint256 gameID) public view returns (uint8[2] memory) {
+        require(games[gameID].gameID != 0, "gameID");
+        return games[gameID].dispute;
+    }
 
     function get_gameid () public returns (uint) {
         return allgameID++;
@@ -87,15 +91,6 @@ contract Lock {
     }
 
     function new_game (address player) public {
-
-        //string memory a = "O";
-        //string memory b = "X";
-        //string memory c = "o";
-        //bytes memory bb = bytes("OX");
-        //bytes memory aa = bytes("OuX");
-
-        //if (aa[2] == bb[1]) 
-        //    console.log("aaaaaaaaaaaaaa ");
 
         require(queue_games[msg.sender] == 0, "You already created a game");
         require(random_queue_games[msg.sender] == 0, "You already created a random joined game");
@@ -369,15 +364,16 @@ contract Lock {
         uint8 errors = 0;
         uint8 z = 0;
 
-        for (uint i=0; i<3; i++) 
-            if (guess[i] == secret[i])
-                if (feedback[z] != check[0]) { z++; errors++; }
+        for (uint i=0; i<4; i++) 
+            if (guess[i] == secret[i]) 
+                if (feedback[z] != check[0]) { z++; errors++; } 
+                else { z++; }
             else 
-                for (uint j=0; j<3; j++) 
+                for (uint j=0; j<4; j++) 
                     if (i != j) 
-                        if (guess[i] == secret[j])
-                            if (feedback[z] != check[1]) { z++; errors++; }
-         
+                        if (guess[i] == secret[j]) 
+                            if (feedback[z] != check[1]) { z++; errors++; } 
+                            else { z++; }
 
         if (errors >= 2) { /* its lost */
             current_game.last_dispute = 3;
@@ -450,7 +446,6 @@ contract Lock {
         }
 
         bytes32 hash = keccak256(bytes(secret));
-
 
         if (hash != current_game.secret){ /* its lost, the secret has changed */
             if (msg.sender == current_game.creator) 
