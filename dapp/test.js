@@ -136,12 +136,6 @@ const sleep = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function startPlaying(gameID, creator) {
 
-    //contract.on("test", (creator, player) => {
-    //    console.log("diooooo\n");
-    //    exit(0);
-    //}
-    //);
-
     contract.on("stop_the_game_event", (id, winner, loser) => {
         if (id == gameID) {
             if (winner == wallet.address)  {
@@ -349,7 +343,7 @@ async function main() {
         await initial_setup(provider, wallet, ethers);
         initial_balance = await wallet.getBalance();
         await contract.new_game('0x0000000000000000000000000000000000000000'); /* new random game */
-            let gameID = (await contract.get_gameid_byaddress()).toString();
+        let gameID = (await contract.get_gameid_byaddress()).toString();
         console.log("game creato con gameID " + gameID + " in attesa");
         let addr = await waitForRandomPlayer();
         while (addr != wallet.address)
