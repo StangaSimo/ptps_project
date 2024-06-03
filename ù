@@ -84,34 +84,6 @@ async function waitForFeedBack() {
         });
     });
 }
-
-async function waitForDispute() {
-    return new Promise(async (resolve) => {
-        contract.once("dispute", (address, dispute) => {
-            resolve([address, dispute]);
-        });
-    });
-}
-
-function askQuestionWithTimeout(question, timeout) {
-    return new Promise((resolve, reject) => {
-        const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
-
-        const timer = setTimeout(() => {
-            rl.close();
-            resolve(null); // Timeout
-        }, timeout);
-
-        rl.question(question, (answer) => {
-            clearTimeout(timer);
-            rl.close();
-            resolve(answer);
-        });
-    });
-}
 /********************************************+ end new */
 
 async function waitForRandomPlayer() {
@@ -133,21 +105,6 @@ async function waitForPlayerCodeMaker() {
 const sleep = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function startPlaying(gameID, creator) {
-
-    contract.on("stop_the_game_event", (gameid, winner, loser) => {
-        if (gameid == gameID) {
-            if (winner == wallet.address)  {
-                console.log("game vinto"); 
-                exit(0);
-            }
-            if (loser == wallet.address)  {
-                console.log("game perso"); 
-                exit(0);
-            }
-        }
-    }
-    );
-
     console.log("Game iniziato");
     let cm_or_cb;
 
@@ -167,7 +124,7 @@ async function startPlaying(gameID, creator) {
     turni = 0;
     while (turni < 2 /*TODO: NT */) {
 
-        if (cm_or_cb == 1) { /* 1 = CM */ 
+        if (cm_or_cb == 1) { /* 1 = CM, 0 = CB */
             console.log("Sei il CodeMaker\n ");
             console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\no = orange\nv = violet\nr = red\ny = yellow\n\n");
 
@@ -180,13 +137,12 @@ async function startPlaying(gameID, creator) {
 
             await contract.send_secret(gameID, hash);
 
-            let i = 0;
-            while (i < 3) {
+            for (let i=0; i<3 /*TODO:NT*/; i++) {
 
                 [addr, guess] = await waitForGuess();
                 while (addr != wallet.address)
                     [addr, guess] = await waitForGuess();
-
+                
                 console.log("Guess: " + guess);
                 console.log("\n\nScrivi il feedback: \n\nO = Colore e Posizione corretta\nX = Colore corretto e posizione non corretta\no = sbagliato\n\n");
 
@@ -196,31 +152,17 @@ async function startPlaying(gameID, creator) {
                     feedback = readlineSync.question("Input errato, riprovare: ");
 
                 await contract.send_feedback(gameID, feedback);
-
-                if (feedback == "OOOO")  /* turno finito */
-                    break;
             }
-
-            console.log("hai guadagnato " + i+1 + " punti");
-
-            i = 0;
 
             cm_or_cb = 0;
             
+
+            //TODO: mettere vincita 
+            //wait tempo disputa
+            
             await contract.end_turn(gameID, secret);
 
-            console.log("Il CB ha 10 secondi per avviare una disputa, in attesa...");
-            [addr, dispute] = await waitForDispute();
-            while (addr != wallet.address)
-                [addr, dispute] = await waitForDispute();
-
-            if (result == 1){
-                console.log ("Hai effettuato un errore, al prossimo sarai punito");
-            } else if (result == 2) {
-                console.log ("Il CB ha effettuato una falsa accusa, alla prossima sarà punito");
-            }
-
-        } else { /* 0 = CB */
+        } else {
 
             console.log("Sei il CodeBreaker, in attesa del segreto...\n");
 
@@ -230,7 +172,7 @@ async function startPlaying(gameID, creator) {
 
             console.log("Il CodeMaker ha depositato il segreto\n");
 
-            for (let i=0; i<3 /* TODO: NT */; i++) {
+            for (let i=0; i<3; i++) {
                 console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\no = orange\nv = violet\nr = red\ny = yellow\n\n");
 
                 let guess = readlineSync.question("Input: ");
@@ -245,44 +187,25 @@ async function startPlaying(gameID, creator) {
                     [addr, feedback] = await waitForFeedBack();
 
                 console.log("Feedback: " + feedback);
-
-                if (feedback == "OOOO") /* turno finito */
-                    console.log("hai indovinato in" + (i+1) + " mosse");
-                    break;
-
             }
 
             console.log("Turno finito\n ");
-
-            let dispute = await askQuestionWithTimeout("hai 10 secondi per avviare una disputa y/n: ", 10000);
-
-            if (dispute === null) {
-                console.log("Tempo scaduto, nessuna disputa avviata.");
-            } else {
-                if (check === 'y') {
-                    console.log("Hai scelto di avviare una disputa.");
-                    console.log("Su quale guess?");
-                    let number_guess = readlineSync.question("Inserisci il numero: ");
-                    await contract.send_dispute(gameID, number_guess);
-
-                    let result = await contract.view_dispute(gameID);
-
-                    if (result == 1){
-                        console.log ("Il CM ha effettuato un errore, al prossimo sarà punito");
-                    } else if (result == 2) {
-                        console.log ("Hai effettuato una falsa accusa alla prossima sarai punito");
-                    }
-                } else {
-                    await contract.send_dispute(gameID, 0);
-                    console.log("Hai scelto di non avviare una disputa.");
-                }
+            console.log("Avviare una Disputa?\n ");
+            let check = readlineSync.question("y/n: ");
+            if (check == "y") {
+                console.log("Su quale guess?");
+                let number_guess = readlineSync.question("Inserisci il numero: ");
+                await contract.send_dispute(gameID, number_guess);
             }
 
             cm_or_cb = 1;
+            //TODO: mettere disputa 
         }
 
         turni++;
     }
+    
+    console.log("esco\n");
 }
 
 function validateGuess(input) {

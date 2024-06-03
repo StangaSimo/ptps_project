@@ -23,7 +23,6 @@ struct Game {
     string[NG][NT] feedbacks; /* solidity funziona al contrario */
     uint8[2] false_accusation;  /* index 0 for creator, index 1 for player */
     uint8[2] dispute; 
-    uint8 last_dispute;  /* 1: error from CM, 2: false accusation from CB */
     uint256[2] points;  /* index 0 for creator, index 1 for player */
     
     /* 0 for creator and 1 for player, if one player have more than 1 the game is lost, 
@@ -46,7 +45,6 @@ contract Lock {
     event feed_back (address player, string feedback); 
     event guess_sent (address player, string guess); 
     event stop_the_game_event (uint256 gameID, address winner, address loser);
-    event dispute (address addr, uint8 result);
 
     mapping (uint256 => Game) public games;                   /* list of all the games */
     mapping (address => uint256) public queue_games;          /* for checking if the player already uses a game */ 
@@ -117,7 +115,6 @@ contract Lock {
         game.false_accusation[1] = 0;
         game.dispute[0] = 0;
         game.dispute[1] = 0;
-        game.last_dispute = 0;
 
         for (uint32 i=0; i < NT; i++ ){
             game.secrets[i] = " "; 
@@ -337,40 +334,38 @@ contract Lock {
     }
  
     //TODO:test
-    function send_dispute (uint256 gameID, uint256 guess_number) public returns (uint8) {
+    function send_dispute (uint256 gameID, uint256 guess_number) public {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
-
+        
         if (msg.sender == current_game.creator) {
             require(current_game.code_maker == 1, "you're not suppose to send the dispute"); 
         } else {
             require(current_game.code_maker == 0, "you're not suppose to send the dispute"); 
         }
-
-        if (guess_number == 0) {
-            if (current_game.code_maker == 1) 
-                emit dispute(current_game.creator, 0); 
-            else 
-                emit dispute(current_game.player, 0); 
-            return 0;
-        }
         
-        bytes memory guess = bytes(current_game.guesses[current_game.nt-1][guess_number-1]);
-        bytes memory feedback = bytes(current_game.feedbacks[current_game.nt-1][guess_number-1]);
+        bytes memory guess = bytes(current_game.guesses[current_game.nt-1][guess_number]);
+        bytes memory feedback = bytes(current_game.feedbacks[current_game.nt-1][guess_number]);
         bytes memory secret = bytes(current_game.secrets[current_game.nt-1]);
         bytes memory check = bytes("OXo");
         uint8 errors = 0;
         uint8 z = 0;
 
+        //TODO: da rivedereeee
+
         for (uint i=0; i<4; i++) 
             if (guess[i] == secret[i])
-                if (feedback[z] != check[0]) { z++; errors++; }
+                if (feedback[z] != check[0]) {
+                    z++;
+                    errors++; 
+                }
             else 
                 for (uint j=0; j<4; j++) 
                     if (i != j) 
                         if (guess[i] == secret[j])
-                            if (feedback[i] != check[1]) { z++; errors++; }
+                            if (feedback[i] != check[1]) 
+                                errors++;
          
 
         if (errors >= 2)  /* its lost */
@@ -379,44 +374,24 @@ contract Lock {
             if (msg.sender == current_game.creator) 
                 if (current_game.dispute[0] == 1)
                     stop_the_game(gameID, current_game.player);
-                else {
+                else
                     current_game.dispute[0]++;
-                    current_game.last_dispute = 1;
-                }
             else 
                 if (current_game.dispute[1] == 1)
-                    stop_the_game(gameID, current_game.creator);
-                else {
+                        stop_the_game(gameID, current_game.creator);
+                else
                     current_game.dispute[1]++;
-                    current_game.last_dispute = 1;
-                }
         else if (errors == 0)  /* 2 false accusation and its lost */
             if (msg.sender == current_game.creator) 
                 if (current_game.false_accusation[0] == 1) 
                     stop_the_game(gameID, current_game.player);
-                else {
+                else 
                     current_game.false_accusation[0]++;
-                    current_game.last_dispute = 1;
-                }
             else
                 if (current_game.false_accusation[1] == 1) 
                     stop_the_game(gameID, current_game.creator);
-                else {
+                else 
                     current_game.false_accusation[1]++;
-                    current_game.last_dispute = 1;
-                }
-
-        if (current_game.code_maker == 1) 
-            emit dispute(current_game.creator, current_game.last_dispute); 
-        else 
-            emit dispute(current_game.player, current_game.last_dispute); 
-
-        return 1; 
-    }
-
-    function view_dispute (uint256 gameID) public view returns (uint8) {
-        require(games[gameID].gameID != 0, "gameID");
-        return games[gameID].last_dispute;
     }
 
     //TODO:test
@@ -444,42 +419,35 @@ contract Lock {
         }
 
         current_game.secrets[current_game.nt-1] = secret;
- 
-        if (msg.sender == current_game.creator) /* 0 for creator, 1 for player */
+            
+        bytes memory feedback = bytes(current_game.feedbacks[current_game.nt-1][current_game.ng-1]);
+        bytes memory check = bytes("O");
+        
+        bool win = true;
+        for (uint i=0; i<4; i++) 
+            if (feedback[i] != check[0])
+                win = false;
+        
+        if (win) { /* CB win */
+            if (msg.sender == current_game.creator) 
+                current_game.points[1]  = current_game.points[1] + current_game.ng;
+            else 
+                current_game.points[0]  = current_game.points[0] + current_game.ng;
+        } else {  /* CM win */
+             if (msg.sender == current_game.creator) 
                 current_game.points[0]  = current_game.points[0] + current_game.ng;
             else 
                 current_game.points[1]  = current_game.points[1] + current_game.ng;
-        
+        }
+
         current_game.ng = 0;
         games[gameID] = current_game;
 
-        //TODO: pareggio
         if (current_game.nt == NT) {
             if(current_game.points[0] > current_game.points[1])  /* creator win */
                 stop_the_game(gameID, current_game.creator);
             else /* player win */
-                stop_the_game(gameID, current_game.creator);           
-
-        //bytes memory feedback = bytes(current_game.feedbacks[current_game.nt-1][current_game.ng-1]);
-        //bytes memory check = bytes("O");
-        //
-        //bool win = true;
-        //for (uint i=0; i<4; i++) 
-        //    if (feedback[i] != check[0])
-        //        win = false;
-        
-        //if (win) { /* CB win */
-        //    if (msg.sender == current_game.creator) 
-        //        current_game.points[1]  = current_game.points[1] + current_game.ng;
-        //    else 
-        //        current_game.points[0]  = current_game.points[0] + current_game.ng;
-        //} else {  /* CM win */
-        //     if (msg.sender == current_game.creator) 
-        //        current_game.points[0]  = current_game.points[0] + current_game.ng;
-        //    else 
-        //        current_game.points[1]  = current_game.points[1] + current_game.ng;
-        //}
-
+                stop_the_game(gameID, current_game.creator);
         }
     }
 
@@ -491,13 +459,12 @@ contract Lock {
 
         payable(winner).transfer(current_game.bet_value * 2);
 
-        if (winner == current_game.creator) {
+        if (winner == current_game.creator) 
             current_game.winner = 0;
             emit stop_the_game_event(gameID, current_game.creator, current_game.player); 
-        } else { 
+        else 
             current_game.winner = 1;
             emit stop_the_game_event(gameID, current_game.player, current_game.creator); 
-        }
 
         current_game.state = 5;
         games[gameID] = current_game;
