@@ -47,6 +47,7 @@ contract Lock {
     event guess_sent (address player, string guess); 
     event stop_the_game_event (uint256 gameID, address winner, address loser);
     event dispute (address addr, uint8 result);
+    event test (address creator, address player);
 
     mapping (uint256 => Game) public games;                   /* list of all the games */
     mapping (address => uint256) public queue_games;          /* for checking if the player already uses a game */ 
@@ -60,15 +61,14 @@ contract Lock {
     }
 
     /* for testing */
-    //function get_secret(uint256 gameID) public view returns (bytes32[NT] memory) {
-    //    require(games[gameID].gameID != 0, "gameID");
-    //    return games[gameID].secrets;
-    //}
-
-    /* for testing */
     function get_guesses(uint256 gameID) public view returns (string[NG][NT] memory) {
         require(games[gameID].gameID != 0, "gameID");
         return games[gameID].guesses;
+    }
+
+    function get_points(uint256 gameID) public view returns (uint256[2] memory) {
+        require(games[gameID].gameID != 0, "gameID");
+        return games[gameID].points;
     }
 
     /* for testing */
@@ -258,11 +258,11 @@ contract Lock {
         uint random_value = uint (keccak256(abi.encodePacked (msg.sender, block.timestamp, gameID))); /* game id for random number */
 
         if ((random_value % 2) == 1) { /* creator start as CM, player as CB */
+            emit player_code_maker(current_game.player, 1); /* for player */
+            current_game.code_maker = 0;                    /* for creator */
+        } else {                      /* creator start as CB, player as CM */
             emit player_code_maker(current_game.player, 0);
             current_game.code_maker = 1;
-        } else {
-            emit player_code_maker(current_game.player, 1);
-            current_game.code_maker = 0;
         }
 
         games[gameID] = current_game;
@@ -286,11 +286,11 @@ contract Lock {
         current_game.secret = secret;
         
         if (msg.sender == current_game.creator) {
-            require(current_game.code_maker == 1, "you're not suppose to send the secret"); 
+            require(current_game.code_maker == 0, "you're not suppose to send the secret"); 
             games[gameID] = current_game;
             emit secret_sent (current_game.player); 
         } else {
-            require(current_game.code_maker == 0, "you're not suppose to send the secret"); 
+            require(current_game.code_maker == 1, "you're not suppose to send the secret"); 
             games[gameID] = current_game;
             emit secret_sent (current_game.creator); 
         }
@@ -307,11 +307,11 @@ contract Lock {
         current_game.guesses[current_game.nt][current_game.ng] = guess;
 
         if (msg.sender == current_game.creator) {
-            require(current_game.code_maker == 0, "you're not suppose to send the guess"); 
+            require(current_game.code_maker == 1, "you're not suppose to send the guess"); 
             games[gameID] = current_game;
             emit guess_sent (current_game.player, guess);
         } else {
-            require(current_game.code_maker == 1, "you're not suppose to send the guess"); 
+            require(current_game.code_maker == 0, "you're not suppose to send the guess"); 
             games[gameID] = current_game;
             emit guess_sent (current_game.creator, guess);
         }
@@ -326,14 +326,15 @@ contract Lock {
         current_game.ng++;
 
         if (msg.sender == current_game.creator) {
-            require(current_game.code_maker == 1, "you're not suppose to send the feedback"); 
+            require(current_game.code_maker == 0, "you're not suppose to send the feedback"); 
             games[gameID] = current_game;
             emit feed_back (current_game.player, feedback);
         } else {
-            require(current_game.code_maker == 0, "you're not suppose to send the feedback"); 
+            require(current_game.code_maker == 1, "you're not suppose to send the feedback"); 
             games[gameID] = current_game;
             emit feed_back (current_game.creator, feedback);
         }   
+
     }
  
     //TODO:test
@@ -342,20 +343,25 @@ contract Lock {
         Game memory current_game = games[gameID];
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
 
+
+        /* code maker is reverted becouse of end_turn, so 1 = creator, 0 = player */
+
         if (msg.sender == current_game.creator) {
-            require(current_game.code_maker == 1, "you're not suppose to send the dispute"); 
-        } else {
             require(current_game.code_maker == 0, "you're not suppose to send the dispute"); 
+        } else {
+            require(current_game.code_maker == 1, "you're not suppose to send the dispute"); 
         }
 
         if (guess_number == 0) {
-            if (current_game.code_maker == 1) 
+            if (current_game.code_maker == 1) {
                 emit dispute(current_game.creator, 0); 
-            else 
+            }
+            else {
                 emit dispute(current_game.player, 0); 
+            }
             return 0;
         }
-        
+
         bytes memory guess = bytes(current_game.guesses[current_game.nt-1][guess_number-1]);
         bytes memory feedback = bytes(current_game.feedbacks[current_game.nt-1][guess_number-1]);
         bytes memory secret = bytes(current_game.secrets[current_game.nt-1]);
@@ -363,53 +369,62 @@ contract Lock {
         uint8 errors = 0;
         uint8 z = 0;
 
-        for (uint i=0; i<4; i++) 
+        for (uint i=0; i<3; i++) 
             if (guess[i] == secret[i])
                 if (feedback[z] != check[0]) { z++; errors++; }
             else 
-                for (uint j=0; j<4; j++) 
+                for (uint j=0; j<3; j++) 
                     if (i != j) 
                         if (guess[i] == secret[j])
-                            if (feedback[i] != check[1]) { z++; errors++; }
+                            if (feedback[z] != check[1]) { z++; errors++; }
          
 
-        if (errors >= 2)  /* its lost */
+        if (errors >= 2) { /* its lost */
+            current_game.last_dispute = 3;
             stop_the_game(gameID, msg.sender);
-        else if (errors == 1) /* one more dispute, at 2 its lost */
-            if (msg.sender == current_game.creator) 
-                if (current_game.dispute[0] == 1)
+        } else if (errors == 1) /* one more dispute, at 2 its lost */
+            if (msg.sender == current_game.creator) {
+                if (current_game.dispute[0] == 1){
+                    current_game.last_dispute = 3; /* CB win */
                     stop_the_game(gameID, current_game.player);
-                else {
+                } else {
                     current_game.dispute[0]++;
                     current_game.last_dispute = 1;
                 }
-            else 
-                if (current_game.dispute[1] == 1)
+            } else {
+                if (current_game.dispute[1] == 1) {
+                    current_game.last_dispute = 3; /* CB win */
                     stop_the_game(gameID, current_game.creator);
-                else {
+                } else {
                     current_game.dispute[1]++;
                     current_game.last_dispute = 1;
                 }
-        else if (errors == 0)  /* 2 false accusation and its lost */
-            if (msg.sender == current_game.creator) 
-                if (current_game.false_accusation[0] == 1) 
-                    stop_the_game(gameID, current_game.player);
-                else {
-                    current_game.false_accusation[0]++;
-                    current_game.last_dispute = 1;
+            } else if (errors == 0) { /* 2 false accusation and its lost */
+                if (msg.sender == current_game.creator) { 
+                    if (current_game.false_accusation[0] == 1) {
+                        current_game.last_dispute = 4; /* CM win */
+                        stop_the_game(gameID, current_game.player);
+                    } else {
+                        current_game.false_accusation[0]++;
+                        current_game.last_dispute = 2;
+                    }
+                } else {  
+                    if (current_game.false_accusation[1] == 1) {
+                        current_game.last_dispute = 4; /* CB win */
+                        stop_the_game(gameID, current_game.creator);
+                    } else {
+                        current_game.false_accusation[1]++;
+                        current_game.last_dispute = 2;
+                    }
                 }
-            else
-                if (current_game.false_accusation[1] == 1) 
-                    stop_the_game(gameID, current_game.creator);
-                else {
-                    current_game.false_accusation[1]++;
-                    current_game.last_dispute = 1;
-                }
+            }
 
         if (current_game.code_maker == 1) 
             emit dispute(current_game.creator, current_game.last_dispute); 
         else 
             emit dispute(current_game.player, current_game.last_dispute); 
+
+        games[gameID] = current_game;
 
         return 1; 
     }
@@ -426,17 +441,18 @@ contract Lock {
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
         current_game.nt++;
         
-        if (msg.sender == current_game.creator) {
-            require(current_game.code_maker == 1, "you're not suppose to end turn"); 
-            current_game.code_maker = 0;
-        } else {
+        if (msg.sender == current_game.creator) { /* set the code_make for the next turn */
             require(current_game.code_maker == 0, "you're not suppose to end turn"); 
-            current_game.code_maker = 1;
+            current_game.code_maker = 1; /* set the player as CM */
+        } else { 
+            require(current_game.code_maker == 1, "you're not suppose to end turn"); 
+            current_game.code_maker = 0; /* set the creator as CM */
         }
 
         bytes32 hash = keccak256(bytes(secret));
 
-        if (hash == current_game.secret){
+
+        if (hash != current_game.secret){ /* its lost, the secret has changed */
             if (msg.sender == current_game.creator) 
                 stop_the_game(gameID, current_game.player);
             else 
@@ -451,35 +467,14 @@ contract Lock {
                 current_game.points[1]  = current_game.points[1] + current_game.ng;
         
         current_game.ng = 0;
+        current_game.last_dispute = 0;
         games[gameID] = current_game;
 
-        //TODO: pareggio
         if (current_game.nt == NT) {
             if(current_game.points[0] > current_game.points[1])  /* creator win */
                 stop_the_game(gameID, current_game.creator);
-            else /* player win */
+            else                                                 /* player win */
                 stop_the_game(gameID, current_game.creator);           
-
-        //bytes memory feedback = bytes(current_game.feedbacks[current_game.nt-1][current_game.ng-1]);
-        //bytes memory check = bytes("O");
-        //
-        //bool win = true;
-        //for (uint i=0; i<4; i++) 
-        //    if (feedback[i] != check[0])
-        //        win = false;
-        
-        //if (win) { /* CB win */
-        //    if (msg.sender == current_game.creator) 
-        //        current_game.points[1]  = current_game.points[1] + current_game.ng;
-        //    else 
-        //        current_game.points[0]  = current_game.points[0] + current_game.ng;
-        //} else {  /* CM win */
-        //     if (msg.sender == current_game.creator) 
-        //        current_game.points[0]  = current_game.points[0] + current_game.ng;
-        //    else 
-        //        current_game.points[1]  = current_game.points[1] + current_game.ng;
-        //}
-
         }
     }
 
@@ -488,6 +483,7 @@ contract Lock {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
         require(address(this).balance >= (current_game.bet_value * 2), "Saldo del contratto insufficiente");
+
 
         payable(winner).transfer(current_game.bet_value * 2);
 

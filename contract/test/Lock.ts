@@ -277,15 +277,6 @@ describe("Lock", function () {
 
     });
 
-    //describe("send_money", function () {
-    //  it("should", async function () {
-    //    const { lock, otherAccount } = await loadFixture(deploy);
-    //    expect(await hre.ethers.provider.getBalance(lock.target)).to.equal(100_000_000);
-    //    await lock.connect(otherAccount).send({value: 100000});
-    //    expect(await hre.ethers.provider.getBalance(lock.target)).to.equal(100_100_000);
-    //  });
-    //});
-
     describe("send_wei", function () {
         it("should send wei correctly", async function () {
             const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
@@ -400,30 +391,425 @@ describe("Lock", function () {
     });
 
     describe("start_game", function () {
-        //it("should return the correct bet check for creator", async function () {
-        //    const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
-        //    await lock.new_game(addr_0);
-        //    await lock.connect(otherAccount).join_random_game();
-        //    let option = 2;
-        //    let value = 100;
-        //    await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
-        //    await lock.connect(otherAccount).make_offer(1,1,value);
-        //    const game = lock.games(1);
-        //    expect((await game).state).to.equal(2);
-        //    expect((await game).bet_value).to.equal(value);
-        //    await lock.send_wei(1,{value: value.toString()});
-        //    await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
-        //    expect(await lock.get_bet_check(1)).to.equal(true);
-        //    expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
-        //});
-
-        it("should revert for incorrect game ID", async function () {
+        it("should start the game correctly when called by creator and deliver the right event", async function () {
+            const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker")
+            //expect((await lock.games(1)).code_maker).to.be.oneOf([0,1]); /* this doesn't work */
         });
+    });
 
-        it("should return false if one of the two didn't pay", async function () {
-        });
+    describe("send_secret", function () {
+        it("should send secret from creator successfully", async function () {
+            const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) {
+                await expect(await lock.send_secret(1,hash)).to.emit(lock, "secret_sent")
+            } else if (cm == BigInt(1)) {
+                await expect(await lock.connect(otherAccount).send_secret(1,hash)).to.emit(lock, "secret_sent")
+            }
+            expect((await lock.games(1)).secret).to.equal(hash);
+        });    
+
+        it("should fail if you're not suppose to send the secret", async function () {
+            const { lock, otherAccount, addr_0 } = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) {
+                await expect(lock.connect(otherAccount).send_secret(1,hash)).to.be.revertedWith("you're not suppose to send the secret");
+            } else if (cm == BigInt(1)) {
+                await expect(lock.send_secret(1,hash)).to.be.revertedWith("you're not suppose to send the secret");
+            }
+        });    
+
+    });
+
+    describe("send_guess", function () {
+        it("should send the guess correctly", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+                await expect(await lock.send_secret(1,hash)).to.emit(lock, "secret_sent")
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.connect(otherAccount).send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bggg");
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bggg");
+            }
+
+            let guess = (await lock.get_guesses(1));
+            expect(guess[0][0]).to.equal("bggg");
+        });    
+
+        it("should fail if you're not suppose to send the guess", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+                await expect(await lock.send_secret(1,hash)).to.emit(lock, "secret_sent")
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(lock.send_guess(1,"bggg")).to.be.revertedWith("you're not suppose to send the guess");
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(lock.connect(otherAccount).send_guess(1,"bggg")).to.be.revertedWith("you're not suppose to send the guess");
+            }
+        });    
+
 
 
     });
 
+    describe("send_feedback", function () {
+
+        it("should send the feedback correctly", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+
+                await expect(await lock.send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.connect(otherAccount).send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bggg");
+                await expect(await lock.send_feedback(1,"Oooo")).to.emit(lock, "feed_back").withArgs(otherAccount.address,"Oooo");
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bggg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"Oooo")).to.emit(lock, "feed_back").withArgs(owner.address,"Oooo");
+            }
+
+            let guess = (await lock.get_guesses(1));
+            let feedbacks = (await lock.get_feedbacks(1));
+            expect(guess[0][0]).to.equal("bggg");
+            expect(feedbacks[0][0]).to.equal("Oooo");
+        });    
+
+
+        it("should fail if you're not suppose to send the feedback", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+
+                await expect(await lock.send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.connect(otherAccount).send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bggg");
+                await expect(lock.connect(otherAccount).send_feedback(1,"bggg")).to.be.revertedWith("you're not suppose to send the feedback");
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bggg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"Oooo")).to.emit(lock, "feed_back").withArgs(owner.address,"Oooo");
+                await expect(lock.send_feedback(1,"bggg")).to.be.revertedWith("you're not suppose to send the feedback");
+            }
+
+            let guess = (await lock.get_guesses(1));
+            let feedbacks = (await lock.get_feedbacks(1));
+            expect(guess[0][0]).to.equal("bggg");
+        });    
+    });
+
+    describe("end_turn", function () {
+
+        it("should end each turn correctly", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+
+                await expect(await lock.send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.connect(otherAccount).send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bggg");
+                await expect(await lock.send_feedback(1,"Oooo")).to.emit(lock, "feed_back").withArgs(otherAccount.address,"Oooo");
+                await expect(await lock.connect(otherAccount).send_guess(1,"bbgg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bbgg");
+                await expect(await lock.send_feedback(1,"OXoo")).to.emit(lock, "feed_back").withArgs(otherAccount.address,"OXoo");
+                await expect(await lock.connect(otherAccount).send_guess(1,"bbbg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bbbg");
+                await expect(await lock.send_feedback(1,"OXXo")).to.emit(lock, "feed_back").withArgs(otherAccount.address,"OXXo");
+                await lock.end_turn(1,"bgov");
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(3);
+                expect(points[1]).to.equal(0);
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bggg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"Oooo")).to.emit(lock, "feed_back").withArgs(owner.address,"Oooo");
+                await expect(await lock.send_guess(1,"bbgg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bbgg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"OXoo")).to.emit(lock, "feed_back").withArgs(owner.address,"OXoo");
+                await expect(await lock.send_guess(1,"bbbg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bbbg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"OXXo")).to.emit(lock, "feed_back").withArgs(owner.address,"OXXo");
+                await lock.connect(otherAccount).end_turn(1,"bgov");
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(0);
+                expect(points[1]).to.equal(3);
+            }
+
+            let guess = (await lock.get_guesses(1));
+            let feedbacks = (await lock.get_feedbacks(1));
+            expect(guess[0][0]).to.equal("bggg");
+            expect(guess[0][1]).to.equal("bbgg");
+            expect(guess[0][2]).to.equal("bbbg");
+            expect(feedbacks[0][0]).to.equal("Oooo");
+            expect(feedbacks[0][1]).to.equal("OXoo");
+            expect(feedbacks[0][2]).to.equal("OXXo");
+        });    
+
+    it("should fail if the secret has changed, and let the other player win", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+            const hash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+
+                await expect(await lock.send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.connect(otherAccount).send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bggg");
+                await expect(await lock.send_feedback(1,"Oooo")).to.emit(lock, "feed_back").withArgs(otherAccount.address,"Oooo");
+                await expect(await lock.connect(otherAccount).send_guess(1,"bbgg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bbgg");
+                await expect(await lock.send_feedback(1,"OXoo")).to.emit(lock, "feed_back").withArgs(otherAccount.address,"OXoo");
+                await expect(await lock.connect(otherAccount).send_guess(1,"bbbg")).to.emit(lock, "guess_sent").withArgs(owner.address,"bbbg");
+                await expect(await lock.send_feedback(1,"OXXo")).to.emit(lock, "feed_back").withArgs(otherAccount.address,"OXXo");
+                await expect(await lock.end_turn(1,"bgvv")).to.emit(lock,"stop_the_game_event")
+                    .withArgs(1,otherAccount.address,owner.address);
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash);        
+                await expect(await lock.send_guess(1,"bggg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bggg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"Oooo")).to.emit(lock, "feed_back").withArgs(owner.address,"Oooo");
+                await expect(await lock.send_guess(1,"bbgg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bbgg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"OXoo")).to.emit(lock, "feed_back").withArgs(owner.address,"OXoo");
+                await expect(await lock.send_guess(1,"bbbg")).to.emit(lock, "guess_sent").withArgs(otherAccount.address,"bbbg");
+                await expect(await lock.connect(otherAccount).send_feedback(1,"OXXo")).to.emit(lock, "feed_back").withArgs(owner.address,"OXXo");
+                await expect(await lock.connect(otherAccount).end_turn(1,"bgvv")).to.emit(lock,"stop_the_game_event")
+                    .withArgs(1,owner.address,otherAccount.address);
+
+            }
+
+            let guess = (await lock.get_guesses(1));
+            let feedbacks = (await lock.get_feedbacks(1));
+            expect(guess[0][0]).to.equal("bggg");
+            expect(guess[0][1]).to.equal("bbgg");
+            expect(guess[0][2]).to.equal("bbbg");
+            expect(feedbacks[0][0]).to.equal("Oooo");
+            expect(feedbacks[0][1]).to.equal("OXoo");
+            expect(feedbacks[0][2]).to.equal("OXXo");
+        });    
+
+        it("should let the right player win", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+            await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker");
+
+            const hash_0 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("bgov")); 
+            const guess_00 = "bggg";
+            const guess_01 = "bbgg";
+            const guess_02 = "bbbg";
+            const feedback_00 = "Oooo";
+            const feedback_01 = "OXoo";
+            const feedback_02 = "OXXo";
+
+            const hash_1 = hre.ethers.keccak256(hre.ethers.toUtf8Bytes("vvvv")); 
+            const guess_10 =  "vrrr";
+            const guess_11 =  "vvvv";
+            const feedback_10 = "Oooo";
+            const feedback_11 = "OOOO";
+
+            let cm = (await lock.games(1)).code_maker;
+            if (cm == BigInt(0)) { /* lock cm */
+
+                await expect(await lock.send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_0);        
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(owner.address, guess_00);
+                await expect(await lock.send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_00);
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_01);
+                await expect(await lock.send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_01);
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_02);
+                await expect(await lock.send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_02);
+                await lock.end_turn(1,"bgov");
+
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(3);
+                expect(points[1]).to.equal(0);
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash_1)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_1);        
+                await expect(await lock.send_guess(1,guess_10)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_10);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_10)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_10);
+                await expect(await lock.send_guess(1,guess_11)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_11);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_11)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_11);
+                await expect(await lock.connect(otherAccount).end_turn(1,"vvvv")).to.emit(lock, "stop_the_game_event").withArgs(1,owner.address,otherAccount.address);
+
+                points = (await lock.get_points(1));
+                expect(points[0]).to.equal(3);
+                expect(points[1]).to.equal(2);
+
+
+            } else if (cm == BigInt(1)) { /* otheraccount cm */
+
+                await expect(await lock.connect(otherAccount).send_secret(1,hash_0)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_0);        
+                await expect(await lock.send_guess(1,guess_00)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_00);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_00)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_00);
+                await expect(await lock.send_guess(1,guess_01)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_01);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_01)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_01);
+                await expect(await lock.send_guess(1,guess_02)).to.emit(lock, "guess_sent").withArgs(otherAccount.address,guess_02);
+                await expect(await lock.connect(otherAccount).send_feedback(1,feedback_02)).to.emit(lock, "feed_back").withArgs(owner.address,feedback_02);
+                await expect(await lock.connect(otherAccount).end_turn(1,"bgov")).to.emit(lock, "stop_the_game_event").withArgs(1,owner.address,otherAccount.address);
+;
+
+                let points = (await lock.get_points(1));
+                expect(points[0]).to.equal(0);
+                expect(points[1]).to.equal(3);
+
+                await expect(await lock.send_secret(1,hash_1)).to.emit(lock, "secret_sent");
+                expect((await lock.games(1)).secret).to.equal(hash_1);        
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_10)).to.emit(lock, "guess_sent").withArgs(owner.address, guess_10);
+                await expect(await lock.send_feedback(1,feedback_10)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_10);
+                await expect(await lock.connect(otherAccount).send_guess(1,guess_11)).to.emit(lock, "guess_sent").withArgs(owner.address,guess_11);
+                await expect(await lock.send_feedback(1,feedback_11)).to.emit(lock, "feed_back").withArgs(otherAccount.address,feedback_11);
+                await lock.end_turn(1,"vvvv");
+
+                points = (await lock.get_points(1));
+                expect(points[0]).to.equal(2);
+                expect(points[1]).to.equal(3);
+
+
+            }
+
+            let guess = (await lock.get_guesses(1));
+            let feedbacks = (await lock.get_feedbacks(1));
+            expect(guess[0][0]).to.equal(guess_00);
+            expect(guess[0][1]).to.equal(guess_01);
+            expect(guess[0][2]).to.equal(guess_02);
+            expect(feedbacks[0][0]).to.equal(feedback_00);
+            expect(feedbacks[0][1]).to.equal(feedback_01);
+            expect(feedbacks[0][2]).to.equal(feedback_02);
+            expect(guess[1][0]).to.equal(guess_10);
+            expect(guess[1][1]).to.equal(guess_11);
+            expect(feedbacks[1][0]).to.equal(feedback_10);
+            expect(feedbacks[1][1]).to.equal(feedback_11);
+        });    
+
+    });    
 });
