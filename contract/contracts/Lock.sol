@@ -474,7 +474,7 @@ contract Lock {
             if(current_game.points[0] > current_game.points[1])  /* creator win */
                 stop_the_game(gameID, current_game.creator);
             else                                                 /* player win */
-                stop_the_game(gameID, current_game.creator);           
+                stop_the_game(gameID, current_game.player);           
         }
     }
 
