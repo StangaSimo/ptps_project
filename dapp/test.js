@@ -1,14 +1,14 @@
 
 /********************************************+ new */
 /* AFK */
-//import process from "process";
-//
-//function sideEffects() {
-//  console.log("triggering downstream work of child");
-//}
-//
-///* CTRL - Z */
-//process.on("SIGTSTP", () => sideEffects);
+import process from "process";
+
+function sideEffects() {
+  console.log("triggering downstream work of child");
+}
+
+/* CTRL - Z */
+process.on("SIGTSTP", () => sideEffects);
 
 
 //TODO: in ascolto per evento perditAAA

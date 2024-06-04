@@ -13,16 +13,35 @@
 //     https://www.alt-codes.net/circle-symbols
 
 // https://docs.ethers.org/v5/api/contract/contract/
-
+    
+ 
 const { exit } = require('process');
-var readlineSync = require('readline-sync');
+
 const fs = require('fs');
 const path = require('path');
 const { ethers, JsonRpcProvider } = require('ethers');
 const { start } = require('repl');
 let address_2_player;
 const readline = require('readline');
+let wallet, contract;
+let gameID = 0;
+async function askQuestion(query) {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
 
+    return new Promise(resolve => rl.question(query, ans => {
+        rl.close();
+        resolve(ans);
+    }))
+}
+
+process.on('SIGTSTP', async () => {
+    await contract.afk_checker(gameID);
+    await sleep(3000);
+    console.log("ho dormito tre secondi");
+});
 
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 
@@ -34,146 +53,55 @@ const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 let url = "http://127.0.0.1:8545"
 const provider = new ethers.providers.JsonRpcProvider(url);
 
-console.log("\n\n");
-console.log("1. 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
-console.log("2. 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
-console.log("3. 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a");
-console.log("4. 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6");
-console.log("5. 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a");
-
-console.log("\n\n");
-
-var userChoice = readlineSync.question("Quale Account usare?");
-console.log("\n\n");
-var privateKey;
-
-switch (userChoice) {
-    case '1':
-        privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-        break;
-    case '2':
-        privateKey = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
-        break;
-    case '3':
-        privateKey = '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a';
-        break;
-    case '4':
-        privateKey = '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6';
-        break;
-    case '5':
-        privateKey = '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a';
-        break;
-    default:
-        console.log("Opzione non valida. Riprova.");
-        exit(0)
-}
-
-const wallet = new ethers.Wallet(privateKey, provider);
-const contract = new ethers.Contract(contractAddress, abi, wallet);
-
-async function waitForOffer() {
-    return new Promise(async (resolve) => {
-        contract.once("offer_value", (addr, option, value) => {
-            resolve([addr, option, value]);
-        });
-    });
-}
-
-async function waitForSecret() {
-    return new Promise(async (resolve) => {
-        contract.once("secret_sent", (address) => {
-            resolve([address]);
-        });
-    });
-}
-
-async function waitForGuess() {
-    return new Promise(async (resolve) => {
-        contract.once("guess_sent", (address, guess) => {
-            resolve([address, guess]);
-        });
-    });
-}
-
-async function waitForEndTurn() {
-    return new Promise(async (resolve) => {
-        contract.once("end_turn", (address, secret) => {
-            resolve([address, secret]);
-        });
-    });
-}
-
-
-
-async function waitForFeedBack() {
-    return new Promise(async (resolve) => {
-        contract.once("feed_back", (address, feedback) => {
-            resolve([address, feedback]);
-        });
-    });
-}
-
-async function waitForDispute() {
-    return new Promise(async (resolve) => {
-        contract.once("dispute", (address, dispute) => {
-            resolve([address, dispute]);
-        });
-    });
-}
-
-function askQuestionWithTimeout(question, timeout) {
-    return new Promise((resolve, reject) => {
-        const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
-
-        const timer = setTimeout(() => {
-            rl.close();
-            resolve(null); // Timeout
-        }, timeout);
-
-        rl.question(question, (answer) => {
-            clearTimeout(timer);
-            rl.close();
-            resolve(answer);
-        });
-    });
-}
-async function waitForPlayerCodeMaker() {
-    return new Promise(async (resolve) => {
-        contract.once("player_code_maker", (player, cm_or_cb) => {
-            resolve([player, cm_or_cb]);
-        });
-    });
-}
-
-async function waitForRandomPlayer() {
-    return new Promise(async (resolve) => {
-        contract.once("random_player_joined", (addr) => {
-            resolve(addr);
-        });
-    });
-}
-
-async function waitForPlayer() {
-    return new Promise(async (resolve) => {
-        contract.once("player_joined", (addr) => {
-            resolve(addr);
-        });
-    });
-}
-
 async function main() {
+
+ 
+    console.log("\n\n");
+    console.log("1. 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+    console.log("2. 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+    console.log("3. 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a");
+    console.log("4. 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6");
+    console.log("5. 0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a");
+    console.log("\n\n");
+
+    var userChoice = await askQuestion("Quale Account usare?");;
+    console.log("\n\n");
+    var privateKey;
+
+    switch (userChoice) {
+        case '1':
+            privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+            break;
+        case '2':
+            privateKey = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
+            break;
+        case '3':
+            privateKey = '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a';
+            break;
+        case '4':
+            privateKey = '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6';
+            break;
+        case '5':
+            privateKey = '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a';
+            break;
+        default:
+            console.log("Opzione non valida. Riprova.");
+            exit(0)
+    }
+
+    wallet = new ethers.Wallet(privateKey, provider);
+    contract = new ethers.Contract(contractAddress, abi, wallet);
+
     console.log("Contract Balance:", (await provider.getBalance(contractAddress)).toString());
     console.log("Wallet Balance:", (await wallet.getBalance()));
     console.log("Wallet Address:", (await wallet.getAddress()));
-    showInitialPrompt();
+
+    await showInitialPrompt();
 }
 
 main().catch(console.error);
 
-function showInitialPrompt() {
+async function showInitialPrompt() {
     console.clear();
     console.log("********************************************");
     console.log("  Benvenuto a Mastermind sulla Blockchain! ");
@@ -185,15 +113,15 @@ function showInitialPrompt() {
     console.log("3. Unisciti a un gioco casuale");
     console.log("\n\n");
 
-    var userChoice = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+    var userChoice = await askQuestion("Inserisci il numero dell'opzione scelta: ");
     console.clear();
     switch (userChoice) {
         case '1':
             newGame();
             break;
         case '2':
-            var gameId = userChoice.question("Inserisci il Game ID: ");
-            joinGame(gameId);
+            gameID = await askQuestion("Inserisci il Game ID: ");
+            joinGame(gameID);
             break;
         case '3':
             joinGame(0);
@@ -210,7 +138,7 @@ async function newGame() {
     console.log("2. specifica indirizzo secondo player");
     console.log("\n\n");
 
-    var userChoice = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+    var userChoice = await askQuestion("Inserisci il numero dell'opzione scelta: ");
 
     switch (userChoice) {
         case '1':
@@ -218,7 +146,7 @@ async function newGame() {
             break;
         case '2':
             console.log("\n\n");
-            address_2_player = readlineSync.question("Inserisci l'address: ");
+            address_2_player = await askQuestion("Inserisci l'address: ");
             await contract.new_game(address_2_player.toString());
             break;
         default:
@@ -226,7 +154,7 @@ async function newGame() {
             await newGame();
     }
 
-    let gameID = (await contract.get_gameid_byaddress()).toString();
+    gameID = (await contract.get_gameid_byaddress()).toString();
 
     console.clear();
     console.log("gameID : " + gameID);
@@ -244,24 +172,24 @@ async function newGame() {
             addr = await waitForPlayer();
     }
 
-    console.log("Secondo player entrato");
-    await startNewGame(gameID);
+    await startNewGame();
 }
 
-async function joinGame(gameID) {
-    if (gameID == 0) {
+async function joinGame(id) {
+    if (id == 0) {
         try {
             await contract.join_random_game();
-            let gameID = (await contract.get_gameid_random_player()).toString();
-            await startGame(gameID);
+            gameID = (await contract.get_gameid_random_player()).toString();
+            await startGame();
         } catch (e) {
             console.log("Nessun game disponibile");
             exit(0)
         }
     } else {
         try {
-            await contract.join_game(gameid);
-            await startNewGame(gameID);
+            gameID = id;
+            await contract.join_game(gameID);
+            await startNewGame();
         } catch (e) {
             console.log("Errore ID");
             exit(0)
@@ -269,8 +197,20 @@ async function joinGame(gameID) {
     }
 }
 
-async function startNewGame(gameID) {
-    value = readlineSync.question("Quanto vuoi scommettere? ");
+function afk_handler (id, addr) {
+    if (addr == wallet.address) {
+        console.log(wallet.address);
+    }
+}
+
+async function startNewGame() {
+
+    contract.on("afk_check", afk_handler);
+
+    console.clear();
+    console.log("Secondo player entrato\n\n");
+    console.log("In qualsiasi momento puoi premere crtl-z per accusare l'altro player di AFK, questo ha 5 secondi per rispondere.\n\n");
+    value = await askQuestion("Quanto vuoi scommettere? ");
     await contract.make_offer(gameID, 2, value); //2 for let second player go in the while
 
     console.log("\n\n");
@@ -289,13 +229,13 @@ async function startNewGame(gameID) {
         console.log("2. Contro Offerta");
         console.log("\n\n");
 
-        option = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+        option = await askQuestion("Inserisci il numero dell'opzione scelta: ");
         switch (option) {
             case '1': //accepted
                 await contract.make_offer(gameID, option, value); 
                 break;
             case '2': //declined
-                var value = readlineSync.question("Quanto vuoi offire? ");
+                var value = await askQuestion("Quanto vuoi offire? ");
                 await contract.make_offer(gameID, option, value);
                 [addr, option, value] = await waitForOffer();
                 while (addr != wallet.address)
@@ -306,14 +246,18 @@ async function startNewGame(gameID) {
         }
     }
 
-    await sendMoney(gameID, value);
-    await startPlaying(gameID,1);
+    await sendMoney(value);
+    await startPlaying(1);
     exit(0);
 }
 
-async function startGame(gameID) {
+async function startGame() {
+
+    contract.on("afk_check", afk_handler);
+    console.log("In qualsiasi momento puoi premere crtl-z per accusare l'altro player di AFK, questo ha 5 secondi per rispondere.");
     console.log("\n\n");
-    console.log("Game ID " + gameID + "\n\nIn attesa dell'offerta del creator...");
+    console.log("GameID " + gameID + "\n\nIn attesa dell'offerta del creator...");
+
     [addr, option, value] = await waitForOffer();
     while (addr != wallet.address) 
         [addr, option, value] = await waitForOffer();
@@ -328,14 +272,14 @@ async function startGame(gameID) {
         console.log("2. Contro Offerta");
         console.log("\n\n");
 
-        option = readlineSync.question("Inserisci il numero dell'opzione scelta: ");
+        option = await askQuestion("Inserisci il numero dell'opzione scelta: ");
 
         switch (option) {
             case '1': //accepted
                 await contract.make_offer(gameID, option, value);
                 break;
             case '2': //declined
-                var value = readlineSync.question("Quanto vuoi offire? ");
+                var value = await askQuestion("Quanto vuoi offire? ");
                 await contract.make_offer(gameID, option, value);
                 [addr, option, value] = await waitForOffer();
                 while (addr != wallet.address)
@@ -347,12 +291,12 @@ async function startGame(gameID) {
 
     }
 
-    await sendMoney(gameID, value);
-    await startPlaying(gameID,0);
+    await sendMoney(value);
+    await startPlaying(0);
     exit(0);
 }
 
-async function sendMoney(gameID, value) {
+async function sendMoney(value) {
     const args = {value: value.toString()}
     const transaction = await contract.send_wei(gameID, args);
     await transaction.wait();
@@ -368,7 +312,7 @@ async function sendMoney(gameID, value) {
 
 const sleep = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function startPlaying(gameID, creator) {
+async function startPlaying(creator) {
 
     contract.on("stop_the_game_event", (id, winner, loser) => {
         if (id == gameID) {
@@ -404,10 +348,10 @@ async function startPlaying(gameID, creator) {
             console.log("Sei il CodeMaker\n ");
             console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\no = orange\nv = violet\nr = red\ny = yellow\n\n");
 
-            let secret = readlineSync.question("Input: ");
+            let secret = await askQuestion("Input: ");
 
             while (!validateGuess(secret)) 
-                secret = readlineSync.question("Input errato, riprovare: ");
+                secret = await askQuestion("Input errato, riprovare: ");
 
             let hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(secret));
 
@@ -425,10 +369,10 @@ async function startPlaying(gameID, creator) {
                 console.log("---- CB GUESS NUMBER " + (i+1) + " : "  + guess + "\n");
                 console.log("\nIl segreto scelto: " + secret + "\nScrivi il feedback: \n\nO = Colore e Posizione corretta\nX = Colore corretto e posizione non corretta\no = sbagliato\n\n");
 
-                let feedback = readlineSync.question("Input: ");
+                let feedback = await askQuestion("Input: ");
 
                 while (!validateFeedback(feedback)) 
-                    feedback = readlineSync.question("Input errato, riprovare: ");
+                    feedback = await askQuestion("Input errato, riprovare: ");
 
                 await contract.send_feedback(gameID, feedback);
 
@@ -472,10 +416,10 @@ async function startPlaying(gameID, creator) {
                 console.log("---- GUESS NUMBER " + (i+1));
                 console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\no = orange\nv = violet\nr = red\ny = yellow\n\n");
 
-                let guess = readlineSync.question("Input: ");
+                let guess = await askQuestion("Input: ");
 
                 while (!validateGuess(guess)) 
-                    guess = readlineSync.question("Input errato, riprovare: ");
+                    guess = await askQuestion("Input errato, riprovare: ");
                 
                 await contract.send_guess(gameID, guess);
                 console.log("In attesa del feedback...\n\n");
@@ -503,10 +447,10 @@ async function startPlaying(gameID, creator) {
                 if (dispute === 'y') {
                     console.log("Hai scelto di avviare una disputa.");
                     console.log("Su quale guess?");
-                    let number_guess = readlineSync.question("Inserisci il numero: ");
+                    let number_guess = await askQuestion("Inserisci il numero: ");
 
                     while (!validateNumber(number_guess)) 
-                        number_guess = readlineSync.question("Input errato, riprovare: ");
+                        number_guess = await askQuestion("Input errato, riprovare: ");
 
                     await contract.send_dispute(gameID, number_guess);
 
@@ -561,3 +505,98 @@ function validateFeedback(input) {
     const validChars = /^[OXo]+$/;
     return validChars.test(input);
 }
+
+
+async function waitForOffer() {
+    return new Promise(async (resolve) => {
+        contract.once("offer_value", (addr, option, value) => {
+            resolve([addr, option, value]);
+        });
+    });
+}
+
+async function waitForSecret() {
+    return new Promise(async (resolve) => {
+        contract.once("secret_sent", (address) => {
+            resolve([address]);
+        });
+    });
+}
+
+async function waitForGuess() {
+    return new Promise(async (resolve) => {
+        contract.once("guess_sent", (address, guess) => {
+            resolve([address, guess]);
+        });
+    });
+}
+
+async function waitForEndTurn() {
+    return new Promise(async (resolve) => {
+        contract.once("end_turn", (address, secret) => {
+            resolve([address, secret]);
+        });
+    });
+}
+
+async function waitForFeedBack() {
+    return new Promise(async (resolve) => {
+        contract.once("feed_back", (address, feedback) => {
+            resolve([address, feedback]);
+        });
+    });
+}
+
+async function waitForDispute() {
+    return new Promise(async (resolve) => {
+        contract.once("dispute", (address, dispute) => {
+            resolve([address, dispute]);
+        });
+    });
+}
+
+function askQuestionWithTimeout(question, timeout) {
+    return new Promise((resolve, reject) => {
+        const ru = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+
+        const timer = setTimeout(() => {
+            ru.close();
+            resolve(null);
+        }, timeout);
+
+        ru.question(question, (answer) => {
+            clearTimeout(timer);
+            ru.close();
+            resolve(answer);
+        });
+    });
+}
+
+async function waitForPlayerCodeMaker() {
+    return new Promise(async (resolve) => {
+        contract.once("player_code_maker", (player, cm_or_cb) => {
+            resolve([player, cm_or_cb]);
+        });
+    });
+}
+
+async function waitForRandomPlayer() {
+    return new Promise(async (resolve) => {
+        contract.once("random_player_joined", (addr) => {
+            resolve(addr);
+        });
+    });
+}
+
+async function waitForPlayer() {
+    return new Promise(async (resolve) => {
+        contract.once("player_joined", (addr) => {
+            resolve(addr);
+        });
+    });
+}
+
+

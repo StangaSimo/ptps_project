@@ -10,7 +10,7 @@ struct Game {
     address creator;     /* first player */
     address player;      /* second player */
     uint8 winner;        /* 0: creator, 1: player */
-    uint8 state;         /* 1: all player joined, 2: wait_for_bet, 3: startplaying 4:endturn, 5: endgame */
+    uint8 state;         /* 1: all player joined, 2: wait_for_bet, 3: wait_for_secret 4:start_playing, 5: endgame */
     uint256 bet_value;   /* bet value in wei */ 
     bool bet_check_creator; 
     bool bet_check_player;
@@ -47,7 +47,7 @@ contract Lock {
     event guess_sent (address player, string guess); 
     event stop_the_game_event (uint256 gameID, address winner, address loser);
     event dispute (address addr, uint8 result);
-    event test (address creator, address player);
+    event afk_check(uint256 gameID, address addr); 
 
     mapping (uint256 => Game) public games;                   /* list of all the games */
     mapping (address => uint256) public queue_games;          /* for checking if the player already uses a game */ 
@@ -242,7 +242,6 @@ contract Lock {
          
     }
 
-    //TODO: test 
     function start_game (uint256 gameID) public  {
         require(games[gameID].gameID != 0, "gameID"); //TODO: test 
         Game memory current_game = games[gameID];
@@ -260,6 +259,7 @@ contract Lock {
             current_game.code_maker = 1;
         }
 
+        current_game.state = 3; /* start playing */
         games[gameID] = current_game;
     }
 
@@ -270,7 +270,6 @@ contract Lock {
         return current_game.code_maker;
     }
 
-    //TODO:test
     function send_secret (uint256 gameID, bytes32 secret) public {
         require(games[gameID].gameID != 0, "gameID");
 
@@ -279,6 +278,7 @@ contract Lock {
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
       
         current_game.secret = secret;
+        current_game.state = 3;
         
         if (msg.sender == current_game.creator) {
             require(current_game.code_maker == 0, "you're not suppose to send the secret"); 
@@ -291,7 +291,6 @@ contract Lock {
         }
     }
 
-    //TODO:test
     function send_guess (uint256 gameID, string memory guess) public {
         require(games[gameID].gameID != 0, "gameID");
 
@@ -312,7 +311,6 @@ contract Lock {
         }
     }
 
-    //TODO:test
     function send_feedback (uint256 gameID, string memory feedback) public {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
@@ -332,15 +330,12 @@ contract Lock {
 
     }
  
-    //TODO:test
     function send_dispute (uint256 gameID, uint256 guess_number) public returns (uint8) {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
 
-
         /* code maker is reverted becouse of end_turn, so 1 = creator, 0 = player */
-
         if (msg.sender == current_game.creator) {
             require(current_game.code_maker == 0, "you're not suppose to send the dispute"); 
         } else {
@@ -430,7 +425,6 @@ contract Lock {
         return games[gameID].last_dispute;
     }
 
-    //TODO:test
     function end_turn (uint256 gameID, string memory secret) public {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
@@ -473,12 +467,10 @@ contract Lock {
         }
     }
 
-    //TODO:test
     function stop_the_game (uint256 gameID, address winner) private {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
         require(address(this).balance >= (current_game.bet_value * 2), "Saldo del contratto insufficiente");
-
 
         payable(winner).transfer(current_game.bet_value * 2);
 
@@ -492,15 +484,23 @@ contract Lock {
 
         current_game.state = 5;
         games[gameID] = current_game;
-}
+    }
 
     //TODO: test
+    // 1: all player joined, 2: wait_for_bet, 3: wait_for_secret 4:start_playing, 5: endgame 
     function afk_checker (uint256 gameID) public returns (uint) {
-                 
+        require(games[gameID].gameID != 0, "gameID");
+        Game memory current_game = games[gameID];
+        require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");
+
+        console.log("AFKFAKFAKFA");
+
+        if(msg.sender == current_game.creator) {
+            emit afk_check(gameID, current_game.player); 
+        } else {
+            emit afk_check(gameID, current_game.creator); 
+        }
+
     }
 
 }
-
-
-
-

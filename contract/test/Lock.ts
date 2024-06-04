@@ -404,7 +404,8 @@ describe("Lock", function () {
             expect(await lock.get_bet_check(1)).to.equal(true);
             expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
             await expect(await lock.start_game(1)).to.emit(lock, "player_code_maker")
-            //expect((await lock.games(1)).code_maker).to.be.oneOf([0,1]); /* this doesn't work */
+            const game = lock.games(1);
+            expect((await game).state).to.equal(3);
         });
     });
 
@@ -1030,10 +1031,24 @@ describe("Lock", function () {
             expect(feedbacks[0][0]).to.equal(feedback_00);
             expect(feedbacks[0][1]).to.equal(feedback_01);
             expect(feedbacks[0][2]).to.equal(feedback_02);
-
        });    
-
-
-
     }); 
+
+    describe("afk_checker", function () {
+
+        it("should send the dispute for 1 error to the CM", async function () {
+            const { lock, otherAccount, addr_0, owner} = await loadFixture(deploy);
+            await lock.new_game(addr_0);
+            await lock.connect(otherAccount).join_random_game();
+            let option = 2;
+            let value = 100;
+            await expect(await lock.make_offer(1,option,value)).to.emit(lock, "offer_value").withArgs(otherAccount.address,option,value);
+            await lock.connect(otherAccount).make_offer(1,1,value);
+            await lock.send_wei(1,{value: value.toString()});
+            await lock.connect(otherAccount).send_wei(1,{value: value.toString()});
+            expect(await lock.get_bet_check(1)).to.equal(true);
+            expect(await lock.connect(otherAccount).get_bet_check(1)).to.equal(true);
+
+        });
+    });
 });
