@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 import "hardhat/console.sol";
 
-uint constant NT = 2; /* number of turns */
+uint constant NT = 3; /* number of turns */
 uint constant NG = 3; /* number of guesses */
 
 struct Game {
@@ -22,19 +22,17 @@ struct Game {
     string[NG][NT] guesses; /* solidity funziona al contrario */
     string[NG][NT] feedbacks; /* solidity funziona al contrario */
     uint8[2] false_accusation;  /* index 0 for creator, index 1 for player */
-    uint8[2] dispute; 
+    uint8[2] dispute;     
+    /* 0 for creator and 1 for player, if one player have more than 1 the game is lost, 
+       if the codemaker make more than one error than the game is lost */
     uint8 last_dispute;  /* 1: error from CM, 2: false accusation from CB */
     uint256[2] points;  /* index 0 for creator, index 1 for player */
     bool[2] last_action;  /* index 0 for creator, index 1 for player */
     
-    /* 0 for creator and 1 for player, if one player have more than 1 the game is lost, 
-        if the codemaker make more than one error than the game is lost */
-}
+   }
 
-/* all struct are declared public for testing purpuses */
+/* all structs are declared public for testing purpuses */
         
-// TODO RIMUVOVERE TUTTI I REQUIRE PER FUNZIONI SOLO VIEW
-
 contract Lock {
     uint256 public allgameID;     /* all games id come from this coutner */
     address payable public owner; /* owner of the contract */
@@ -54,14 +52,13 @@ contract Lock {
     mapping (address => uint256) public queue_games;          /* for checking if the player already uses a game */ 
     mapping (address => uint256) public random_queue_games;   /* for checking if the player already uses a game */ 
     mapping (address => uint256) public random_player_gameID; /* for letting randomplayer have the gameID */
-    address[] public it_random_queue_games;                   /* for iterationg random_queue_games */
+    address[] public it_random_queue_games;                   /* for iterationg random_queue_games */ 
 
     constructor () payable {
         allgameID = 1;
         owner = payable(msg.sender);
     }
 
-    /* for testing */
     function get_guesses(uint256 gameID) public view returns (string[NG][NT] memory) {
         require(games[gameID].gameID != 0, "gameID");
         return games[gameID].guesses;
@@ -72,7 +69,6 @@ contract Lock {
         return games[gameID].points;
     }
 
-    /* for testing */
     function get_feedbacks(uint256 gameID) public view returns (string[NG][NT] memory) {
         require(games[gameID].gameID != 0, "gameID");
         return games[gameID].feedbacks;
@@ -132,7 +128,7 @@ contract Lock {
             queue_games[msg.sender] = game.gameID;
         }
 
-        games[game.gameID] = game;                        /* dobbiamo aspettare un'altro giocatore */ 
+        games[game.gameID] = game;                       
     }
 
     function get_gameid_byaddress () public view returns (uint256) {
@@ -248,7 +244,7 @@ contract Lock {
     }
 
     function start_game (uint256 gameID) public  {
-        require(games[gameID].gameID != 0, "gameID"); //TODO: test 
+        require(games[gameID].gameID != 0, "gameID"); 
         Game memory current_game = games[gameID];
 
         require(current_game.state == 2, "the game state is incorrect");
@@ -498,7 +494,7 @@ contract Lock {
     }
 
     // 1: all player joined, 2: wait_for_bet, 3: wait_for_secret 4:start_playing, 5: endgame 
-    function afk_checker (uint256 gameID) public returns (uint) {
+    function afk_checker (uint256 gameID) public {
         require(games[gameID].gameID != 0, "gameID");
         Game memory current_game = games[gameID];
         require(msg.sender == current_game.creator || msg.sender == current_game.player,"you aren't part of this game");

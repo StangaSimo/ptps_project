@@ -11,8 +11,6 @@ function sideEffects() {
 process.on("SIGTSTP", () => sideEffects);
 
 
-//TODO: in ascolto per evento perditAAA
-
 const readline = require('readline');
 
 /********************************************+ end new */

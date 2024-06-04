@@ -1,31 +1,14 @@
-
-//     \x1B[31m = RED
-//     \x1B[32m = GREEN
-//     \x1B[96m = Blue
-//     \x1B[01;95m = PURPLE
-//     \x1B[01;94m = VIOLET
-//     \x1B[01;93m = Yellow
-//     \x1B[01;91m = ORANGE
-//     \x1B[01;90m = GREY
-//     \x1B[01;89m = WHITE
-//     \x1B[0m = Back to your terminal's default colour
-//     ⬤
-//     https://www.alt-codes.net/circle-symbols
-
-// https://docs.ethers.org/v5/api/contract/contract/
-    
- 
 const { exit } = require('process');
-
 const fs = require('fs');
 const path = require('path');
-const { ethers, JsonRpcProvider } = require('ethers');
-const { start } = require('repl');
-let address_2_player;
+const { ethers } = require('ethers');
+//const { start } = require('repl');
 const readline = require('readline');
 let wallet, contract;
 let gameID = 0;
 let afk_mode = false; /* false disable afk , true enable afk */
+const NT = 3;
+const NG = 3;
 
 async function askQuestion(query) {
     const rl = readline.createInterface({
@@ -42,8 +25,6 @@ async function askQuestion(query) {
 process.on('SIGTSTP', afk_key_handler);
 
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
-
-/* provider.getBalance is broken in etherjs with test network */
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 const abi = contractJson.abi;
 const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
@@ -52,7 +33,6 @@ const provider = new ethers.providers.JsonRpcProvider(url);
 
 async function main() {
 
- 
     console.log("\n\n");
     console.log("1. 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
     console.log("2. 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
@@ -89,6 +69,7 @@ async function main() {
     wallet = new ethers.Wallet(privateKey, provider);
     contract = new ethers.Contract(contractAddress, abi, wallet);
 
+    /* provider.getBalance is broken in etherjs with test network */
     console.log("Contract Balance:", (await provider.getBalance(contractAddress)).toString());
     console.log("Wallet Balance:", (await wallet.getBalance()));
     console.log("Wallet Address:", (await wallet.getAddress()));
@@ -136,15 +117,14 @@ async function newGame() {
     console.log("\n\n");
 
     var userChoice = await askQuestion("Inserisci il numero dell'opzione scelta: ");
-
     switch (userChoice) {
         case '1':
             await contract.new_game('0x0000000000000000000000000000000000000000');
             break;
         case '2':
             console.log("\n\n");
-            address_2_player = await askQuestion("Inserisci l'address: ");
-            await contract.new_game(address_2_player.toString());
+            const question = await askQuestion("Inserisci l'address: ");
+            await contract.new_game(question.toString());
             break;
         default:
             console.log("Opzione non valida. Riprova.");
@@ -234,7 +214,7 @@ async function startNewGame() {
 
     afk_mode = false; /* disable afk report */
 
-    while (option != 1) { //declined
+    while (option != 1) { /* offert declined */
         console.log("Il Secondo player ha declinato l'offerta, offre a sua volta: " + value + " wei");
         console.log("\n\n");
         console.log("Scegli un'opzione:");
@@ -244,13 +224,12 @@ async function startNewGame() {
 
         option = await askQuestion("Inserisci il numero dell'opzione scelta: ");
         switch (option) {
-            case '1': //accepted
+            case '1': /* accepted */
                 await contract.make_offer(gameID, option, value); 
                 break;
-            case '2': //declined
+            case '2': 
                 var value = await askQuestion("Quanto vuoi offire? ");
                 await contract.make_offer(gameID, option, value);
-
                 console.log("\n\n");
                 console.log("In attesa della risposta del secondo player...\n");
                 console.log("\n\n");
@@ -277,7 +256,6 @@ async function startNewGame() {
 async function startGame() {
     contract.on("afk_check", afk_handler);
     console.log("Nei momenti di attesa puoi premere crtl-z per accusare l'altro player di AFK, questo ha 5 secondi per rispondere.");
-
 
     console.log("\n\n");
     console.log("GameID " + gameID + "\n\nIn attesa dell'offerta del creator...");
@@ -373,7 +351,7 @@ async function startPlaying(creator) {
     }
 
     turni = 0;
-    while (turni < 2 /*TODO: NT */) {
+    while (turni < NT) {
 
         if (cm_or_cb == 0) {  
             console.log("Sei il CodeMaker\n ");
@@ -389,7 +367,7 @@ async function startPlaying(creator) {
             await contract.send_secret(gameID, hash);
 
             let i = 0;
-            while (i < 3) {
+            while (i < NG) {
 
                 console.log("In attesa della guess...\n\n");
 
@@ -451,7 +429,7 @@ async function startPlaying(creator) {
 
             console.log("Il CodeMaker ha depositato il segreto\n");
 
-            for (let i=0; i<3 /* TODO: NT */; i++) {
+            for (let i=0; i<NG; i++) {
                 console.log("---- GUESS NUMBER " + (i+1));
                 console.log("Quale combinazione vuoi fare? \nb = blue\ng = green\no = orange\nv = violet\nr = red\ny = yellow\n\n");
 
@@ -574,14 +552,6 @@ async function waitForGuess() {
     });
 }
 
-async function waitForEndTurn() {
-    return new Promise(async (resolve) => {
-        contract.once("end_turn", (address, secret) => {
-            resolve([address, secret]);
-        });
-    });
-}
-
 async function waitForFeedBack() {
     return new Promise(async (resolve) => {
         contract.once("feed_back", (address, feedback) => {
@@ -599,7 +569,7 @@ async function waitForDispute() {
 }
 
 function askQuestionWithTimeout(question, timeout) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const ru = readline.createInterface({
             input: process.stdin,
             output: process.stdout
