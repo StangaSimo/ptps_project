@@ -25,6 +25,8 @@ let address_2_player;
 const readline = require('readline');
 let wallet, contract;
 let gameID = 0;
+let afk_mode = false; /* false disable afk , true enable afk */
+
 async function askQuestion(query) {
     const rl = readline.createInterface({
         input: process.stdin,
@@ -37,16 +39,11 @@ async function askQuestion(query) {
     }))
 }
 
-process.on('SIGTSTP', async () => {
-    await contract.afk_checker(gameID);
-    await sleep(3000);
-    console.log("ho dormito tre secondi");
-});
+process.on('SIGTSTP', afk_key_handler);
 
 const abiPath = path.resolve(__dirname, '../contract/artifacts/contracts/Lock.sol/Lock.json');
 
 /* provider.getBalance is broken in etherjs with test network */
-
 const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 const abi = contractJson.abi;
 const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
@@ -197,19 +194,31 @@ async function joinGame(id) {
     }
 }
 
-function afk_handler (id, addr) {
-    if (addr == wallet.address) {
-        console.log(wallet.address);
+/**************  afk handlers  **************/
+async function afk_key_handler () {
+    if (afk_mode) {
+        await contract.afk_checker(gameID);
+        await sleep(5000);
+        await contract.afk_viewer(gameID);
+    } else {
+        console.log("Non puoi accusare l'altro player di AFK in questa fase");
     }
 }
 
+function afk_handler (addr) {
+    if (addr == wallet.address) {
+        console.log("\nSei stato accusato di AFK, fai una mossa entro 5 secondi\n");
+    }
+}
+
+/**************  start game for creator  **************/
 async function startNewGame() {
 
     contract.on("afk_check", afk_handler);
 
     console.clear();
     console.log("Secondo player entrato\n\n");
-    console.log("In qualsiasi momento puoi premere crtl-z per accusare l'altro player di AFK, questo ha 5 secondi per rispondere.\n\n");
+    console.log("Nei momenti di attesa puoi premere crtl-z per accusare l'altro player di AFK, questo ha 5 secondi per rispondere.\n\n");
     value = await askQuestion("Quanto vuoi scommettere? ");
     await contract.make_offer(gameID, 2, value); //2 for let second player go in the while
 
@@ -217,9 +226,13 @@ async function startNewGame() {
     console.log("In attesa della risposta del secondo player...\n");
     console.log("\n\n");
 
+    afk_mode = true; /* enable afk report */
+
     [addr, option, value] = await waitForOffer();
     while (addr != wallet.address) 
         [addr, option, value] = await waitForOffer();
+
+    afk_mode = false; /* disable afk report */
 
     while (option != 1) { //declined
         console.log("Il Secondo player ha declinato l'offerta, offre a sua volta: " + value + " wei");
@@ -237,9 +250,18 @@ async function startNewGame() {
             case '2': //declined
                 var value = await askQuestion("Quanto vuoi offire? ");
                 await contract.make_offer(gameID, option, value);
+
+                console.log("\n\n");
+                console.log("In attesa della risposta del secondo player...\n");
+                console.log("\n\n");
+
+                afk_mode = true; /* enable afk report */
+
                 [addr, option, value] = await waitForOffer();
                 while (addr != wallet.address)
                     [addr, option, value] = await waitForOffer();
+
+                afk_mode = false; /* disable afk report */
                 break;
             default:
                 console.log("Opzione non valida. Riprova.");
@@ -251,17 +273,22 @@ async function startNewGame() {
     exit(0);
 }
 
+/**************  start game for player  **************/
 async function startGame() {
-
     contract.on("afk_check", afk_handler);
-    console.log("In qualsiasi momento puoi premere crtl-z per accusare l'altro player di AFK, questo ha 5 secondi per rispondere.");
+    console.log("Nei momenti di attesa puoi premere crtl-z per accusare l'altro player di AFK, questo ha 5 secondi per rispondere.");
+
+
     console.log("\n\n");
     console.log("GameID " + gameID + "\n\nIn attesa dell'offerta del creator...");
+
+    afk_mode = true; /* enable afk report */
 
     [addr, option, value] = await waitForOffer();
     while (addr != wallet.address) 
         [addr, option, value] = await waitForOffer();
 
+    afk_mode = false; /* disable afk report */
 
     while (option != 1) {
         console.log("\n\n");
@@ -281,14 +308,18 @@ async function startGame() {
             case '2': //declined
                 var value = await askQuestion("Quanto vuoi offire? ");
                 await contract.make_offer(gameID, option, value);
+
+                afk_mode = true; 
+
                 [addr, option, value] = await waitForOffer();
                 while (addr != wallet.address)
                     [addr, option, value] = await waitForOffer();
+
+                afk_mode = false; 
                 break;
             default:
                 console.log("Opzione non valida. Riprova.");
         }
-
     }
 
     await sendMoney(value);
@@ -362,9 +393,13 @@ async function startPlaying(creator) {
 
                 console.log("In attesa della guess...\n\n");
 
+                afk_mode = true; 
+
                 [addr, guess] = await waitForGuess();
                 while (addr != wallet.address)
                     [addr, guess] = await waitForGuess();
+
+                afk_mode = false; 
 
                 console.log("---- CB GUESS NUMBER " + (i+1) + " : "  + guess + "\n");
                 console.log("\nIl segreto scelto: " + secret + "\nScrivi il feedback: \n\nO = Colore e Posizione corretta\nX = Colore corretto e posizione non corretta\no = sbagliato\n\n");
@@ -406,9 +441,13 @@ async function startPlaying(creator) {
 
             console.log("Sei il CodeBreaker, in attesa del segreto...\n");
 
+            afk_mode = true; 
+
             [addr] = await waitForSecret();
             while (addr != wallet.address)
                 [addr] = await waitForSecret();
+
+            afk_mode = false; 
 
             console.log("Il CodeMaker ha depositato il segreto\n");
 
@@ -424,9 +463,13 @@ async function startPlaying(creator) {
                 await contract.send_guess(gameID, guess);
                 console.log("In attesa del feedback...\n\n");
 
+                afk_mode = true; 
+
                 [addr, feedback] = await waitForFeedBack();
                 while (addr != wallet.address)
                     [addr, feedback] = await waitForFeedBack();
+
+                afk_mode = false; 
 
                 console.log("Feedback: " + feedback + "\n");
 
